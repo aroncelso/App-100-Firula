@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { Player, Match, HalfStats } from '../types';
 import { Trophy, Target, TrendingUp, Calendar, ChevronRight, Shield, Flag, AlertTriangle, UserMinus, Flame, Footprints, Square, ShieldAlert } from 'lucide-react';
@@ -201,7 +200,7 @@ const Dashboard: React.FC<Props> = ({ players, matches }) => {
             <div className="flex items-center justify-between relative z-10 mt-4">
               <div className="flex flex-col items-center gap-2 w-20 text-center">
                 <div className="w-14 h-14 rounded-full bg-black border border-[#F4BE02]/30 flex items-center justify-center p-2 shadow-xl">
-                  <img src="https://i.postimg.cc/JhsJShYM/100_firula_II.jpg" className="w-full h-full rounded-full opacity-80" />
+                  <img src="https://i.postimg.cc/tR3cPQZd/100-firula-II-removebg-preview.png" className="w-full h-full rounded-full opacity-80" />
                 </div>
                 <p className="text-[10px] font-bold uppercase tracking-tight truncate w-full">100 Firula</p>
               </div>

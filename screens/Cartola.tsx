@@ -52,9 +52,10 @@ const Cartola: React.FC<Props> = ({ matches, players }) => {
       let matchesCount = 0;
 
       matches.forEach(match => {
-          // Filter by Year
-          if (!match.date || match.date.split('-')[0] !== selectedYear) return;
-          if (match.isFriendly) return; // Usually fantasy leagues don't count friendlies, assuming this.
+          // Filter by Year and Validity
+          if (!match.date) return;
+          if (match.date.split('-')[0] !== selectedYear) return;
+          if (match.isFriendly) return;
           
           let matchPoints = 0;
           let played = false;

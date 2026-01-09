@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Trophy, 
   Users, 
@@ -32,7 +32,12 @@ const App: React.FC = () => {
   
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState(false);
-  const [isDataLoaded, setIsDataLoaded] = useState(false); // Controls when auto-sync can start
+  const [isDataLoaded, setIsDataLoaded] = useState(false); // Controls UI indicator
+  
+  // Ref to track if the initial load is complete. 
+  // We use this to prevent the useEffect hooks from syncing data back to the server 
+  // immediately after we just fetched it.
+  const isSyncEnabled = useRef(false);
 
   // --- Initial Fetch ---
   useEffect(() => {
@@ -47,9 +52,12 @@ const App: React.FC = () => {
             if (data.EXPENSES) setExpenses(data.EXPENSES);
             if (data.PAYMENTS) setPayments(data.PAYMENTS);
             
-            // Allow sync only after data is successfully loaded
-            // This prevents overwriting the cloud database with empty local state on error
-            setTimeout(() => setIsDataLoaded(true), 1000); 
+            setIsDataLoaded(true);
+            
+            // Enable sync after a short delay to ensure initial state render doesn't trigger it
+            setTimeout(() => {
+                isSyncEnabled.current = true;
+            }, 1500);
         } else {
             setFetchError(true);
         }
@@ -63,7 +71,7 @@ const App: React.FC = () => {
     setPlayers(prev => [...prev, newPlayer]);
     setPayments(prev => [...prev, {
       playerId: newPlayer.id,
-      month: 'Novembro', // You might want to make this dynamic
+      month: 'Novembro',
       status: 'Pendente',
       value: 50.00
     }]);
@@ -71,39 +79,39 @@ const App: React.FC = () => {
   };
 
   // --- Auto Sync Effects ---
-  // Only run sync if data has been successfully loaded first (SAFETY CHECK)
-  
+  // Using isSyncEnabled.current ensures we only save when the USER makes changes, not when the app loads.
+
   useEffect(() => {
-    if (!isDataLoaded) return;
+    if (!isSyncEnabled.current) return;
     const timeout = setTimeout(() => {
         api.syncPlayers(players);
     }, 2000);
     return () => clearTimeout(timeout);
-  }, [players, isDataLoaded]);
+  }, [players]);
 
   useEffect(() => {
-    if (!isDataLoaded) return;
+    if (!isSyncEnabled.current) return;
     const timeout = setTimeout(() => {
         api.syncMatches(matches);
     }, 2000);
     return () => clearTimeout(timeout);
-  }, [matches, isDataLoaded]);
+  }, [matches]);
 
   useEffect(() => {
-    if (!isDataLoaded) return;
+    if (!isSyncEnabled.current) return;
     const timeout = setTimeout(() => {
         api.syncPayments(payments);
     }, 2000);
     return () => clearTimeout(timeout);
-  }, [payments, isDataLoaded]);
+  }, [payments]);
 
   useEffect(() => {
-    if (!isDataLoaded) return;
+    if (!isSyncEnabled.current) return;
     const timeout = setTimeout(() => {
         api.syncExpenses(expenses);
     }, 2000);
     return () => clearTimeout(timeout);
-  }, [expenses, isDataLoaded]);
+  }, [expenses]);
 
 
   const renderScreen = () => {
@@ -123,7 +131,7 @@ const App: React.FC = () => {
           <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4 text-white">
               <div className="relative">
                  <div className="absolute inset-0 bg-[#F4BE02] blur-[20px] opacity-20 rounded-full animate-pulse"></div>
-                 <img src="https://i.postimg.cc/JhsJShYM/100_firula_II.jpg" className="w-20 h-20 rounded-full border border-[#F4BE02]/30 relative z-10 animate-bounce" />
+                 <img src="https://i.postimg.cc/tR3cPQZd/100-firula-II-removebg-preview.png" className="w-20 h-20 rounded-full border border-[#F4BE02]/30 relative z-10 animate-bounce" />
               </div>
               <div className="flex items-center gap-2 text-[#F4BE02]">
                   <Loader2 className="animate-spin" />
@@ -169,7 +177,7 @@ const App: React.FC = () => {
           <div className="relative">
             <div className="absolute inset-0 bg-[#F4BE02] blur-[8px] opacity-20 rounded-full animate-pulse"></div>
             <img 
-              src="https://i.postimg.cc/JhsJShYM/100_firula_II.jpg" 
+              src="https://i.postimg.cc/tR3cPQZd/100-firula-II-removebg-preview.png" 
               alt="100 Firula Logo" 
               className="w-10 h-10 rounded-full border border-[#F4BE02]/40 relative z-10"
             />
@@ -198,7 +206,7 @@ const App: React.FC = () => {
         {renderScreen()}
       </main>
 
-      <nav className="fixed bottom-6 left-5 right-5 z-50 glass rounded-3xl border border-white/[0.08] px-2 py-2 flex justify-between items-center safe-bottom gold-glow shadow-2xl">
+      <nav className="fixed bottom-6 left-5 right-5 z-50 bg-[#262626] rounded-3xl border border-white/20 px-2 py-2 flex justify-between items-center safe-bottom shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
         <NavButton 
           active={currentScreen === 'DASHBOARD'} 
           onClick={() => setCurrentScreen('DASHBOARD')}

@@ -186,6 +186,7 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
     const groups: Record<string, { date: string, opponent: string, matches: Match[] }> = {};
     
     matches.forEach(match => {
+        if (!match.date) return;
         const key = `${match.date}_${match.opponent}`;
         if (!groups[key]) {
             groups[key] = { date: match.date, opponent: match.opponent, matches: [] };

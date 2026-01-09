@@ -1,7 +1,7 @@
 import { Player, Match, Expense, Payment } from '../types';
 
 // ATENÇÃO: SUBSTITUA PELA URL DO SEU SCRIPT GOOGLE AQUI
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwuA5E2YKb9PIZ7Er7pW0nl4u1OcV4Fs7GruQyZ11T46nif8Db9Wu7n51EzT0P3P3x1_g/exec';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw7GrQVX8Qv_GbZy4WDkzZ85jbyltNYmdxyiDmxU3ujJm9yTkkU-TkjIfJMqJEf1tH2CA/exec';
 
 type DataType = 'PLAYERS' | 'MATCHES' | 'EXPENSES' | 'PAYMENTS';
 
