@@ -160,6 +160,7 @@ const Cartola: React.FC<Props> = ({ matches, players }) => {
           {rankedPlayers.map((player, index) => {
               const rank = index + 1;
               const isTop3 = rank <= 3;
+              const playerName = player.name || '';
               
               return (
                   <div key={player.id} className="relative group">
@@ -181,7 +182,7 @@ const Cartola: React.FC<Props> = ({ matches, players }) => {
                                <div className="relative">
                                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-display font-bold text-lg border
                                     ${rank === 1 ? 'bg-[#F4BE02]/10 text-[#F4BE02] border-[#F4BE02]/20' : 'bg-white/5 text-white/60 border-white/10'}`}>
-                                      {player.name.charAt(0)}
+                                      {playerName.charAt(0) || '?'}
                                   </div>
                                   {rank === 1 && (
                                       <div className="absolute -top-3 -right-2">
@@ -191,7 +192,7 @@ const Cartola: React.FC<Props> = ({ matches, players }) => {
                                </div>
                                <div>
                                    <div className="flex items-center gap-2">
-                                     <h3 className="font-bold text-sm text-white">{player.name}</h3>
+                                     <h3 className="font-bold text-sm text-white">{playerName}</h3>
                                      <span className="text-[8px] font-black uppercase tracking-wider text-white/30 px-1.5 py-0.5 rounded bg-white/5">{player.position}</span>
                                    </div>
                                    <div className="flex items-center gap-3 mt-1 text-[9px] text-white/40 font-bold uppercase tracking-wider">

@@ -358,13 +358,14 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
                  {sortedPlayers.map(p => {
                      // Check if player was in the roster for that match
                      const score = tempRatings[p.id] || 0;
+                     const playerName = p.name || '';
                      return (
                          <div key={p.id} className={`p-4 rounded-2xl border flex items-center justify-between transition-all ${score > 0 ? 'bg-white/[0.03] border-[#F4BE02]/20' : 'bg-transparent border-white/5 opacity-60 hover:opacity-100'}`}>
                              <div className="flex items-center gap-3">
                                  <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center font-bold text-sm">
-                                     {p.name.charAt(0)}
+                                     {playerName.charAt(0) || '?'}
                                  </div>
-                                 <span className="font-bold text-sm">{p.name}</span>
+                                 <span className="font-bold text-sm">{playerName}</span>
                              </div>
                              
                              <div className="flex items-center gap-3">
@@ -429,6 +430,7 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
               <div className="flex-1 overflow-y-auto p-4 space-y-2">
                  {sortedPlayers.map(p => {
                      const isSelected = getActiveRoster().includes(p.id);
+                     const playerName = p.name || '';
                      return (
                          <button 
                             key={p.id} 
@@ -437,9 +439,9 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
                          >
                              <div className="flex items-center gap-3">
                                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm transition-colors ${isSelected ? 'bg-white/10 text-white' : 'bg-white/5 text-white/30'}`}>
-                                     {p.name.charAt(0)}
+                                     {playerName.charAt(0) || '?'}
                                  </div>
-                                 <span className="font-bold text-sm">{p.name}</span>
+                                 <span className="font-bold text-sm">{playerName}</span>
                              </div>
                              
                              <div className={`w-6 h-6 rounded-full border flex items-center justify-center ${isSelected ? 'bg-[#F4BE02] border-[#F4BE02] text-black' : 'border-white/20'}`}>
@@ -611,39 +613,42 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
 
                 {/* Player List */}
                 <div className="flex-1 p-3 space-y-1.5 pb-32">
-                   {sortedPlayers.filter(p => getActiveRoster().includes(p.id)).map(player => (
-                     <div key={player.id}>
-                        <div className="grid grid-cols-[1.5fr_repeat(5,1fr)] gap-1.5 items-center bg-white/[0.02] border border-white/[0.05] p-2 rounded-xl">
-                            <div className="truncate pr-1">
-                                <p className="text-xs font-bold text-white leading-none truncate">{player.name}</p>
-                                <p className="text-[8px] text-white/30 uppercase mt-1 font-bold">{player.position.substring(0,3)}</p>
-                            </div>
-                            <StatButton count={getPlayerEventCount(player.id, 'GOL')} onClick={() => handlePlayerEvent(player.id, 'GOL')} colorClass="text-green-500 bg-green-500/10 border-green-500/20 active:bg-green-500 active:text-black" isRemoveMode={isRemoveMode} />
-                            <StatButton count={getPlayerEventCount(player.id, 'ASSIST')} onClick={() => handlePlayerEvent(player.id, 'ASSIST')} icon={<Zap size={10} />} colorClass="text-[#F4BE02] bg-[#F4BE02]/10 border-[#F4BE02]/20 active:bg-[#F4BE02] active:text-black" isRemoveMode={isRemoveMode} />
-                            <StatButton count={getPlayerEventCount(player.id, 'FALTA')} onClick={() => handlePlayerEvent(player.id, 'FALTA')} icon={<ShieldAlert size={10} />} colorClass="text-red-500 bg-red-500/10 border-red-500/20 active:bg-red-500 active:text-white" isRemoveMode={isRemoveMode} />
-                            <StatButton count={getPlayerEventCount(player.id, 'AMARELO')} onClick={() => handlePlayerEvent(player.id, 'AMARELO')} icon={<Square size={10} fill="currentColor" />} colorClass="text-yellow-500 bg-yellow-500/10 border-yellow-500/20 active:bg-yellow-500 active:text-black" isRemoveMode={isRemoveMode} />
-                            
-                            <button 
-                                onClick={() => setExpandedPlayerId(expandedPlayerId === player.id ? null : player.id)}
-                                className={`h-10 rounded-lg flex items-center justify-center border transition-all ${expandedPlayerId === player.id ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 text-white/40'}`}
-                            >
-                                <MoreHorizontal size={14} />
-                            </button>
-                        </div>
-                        
-                        {/* Expanded Stats Row (Cartola) */}
-                        {expandedPlayerId === player.id && (
-                            <div className="mt-1 bg-[#111] rounded-xl p-2 grid grid-cols-6 gap-1 animate-in slide-in-from-top-2">
-                                <StatButton count={getPlayerEventCount(player.id, 'VERMELHO')} onClick={() => handlePlayerEvent(player.id, 'VERMELHO')} icon={<Square size={10} fill="currentColor" />} colorClass="text-red-700 bg-red-700/10 border-red-700/20 active:bg-red-700 active:text-white" isRemoveMode={isRemoveMode} />
-                                <StatButton count={getPlayerEventCount(player.id, 'DEFESA_PENALTI')} onClick={() => handlePlayerEvent(player.id, 'DEFESA_PENALTI')} icon={<Hand size={10} />} colorClass="text-blue-400 bg-blue-400/10 border-blue-400/20" isRemoveMode={isRemoveMode} />
-                                <StatButton count={getPlayerEventCount(player.id, 'GOL_CONTRA')} onClick={() => handlePlayerEvent(player.id, 'GOL_CONTRA')} icon={<Footprints size={10} className="rotate-180" />} colorClass="text-orange-500 bg-orange-500/10 border-orange-500/20" isRemoveMode={isRemoveMode} />
-                                <StatButton count={getPlayerEventCount(player.id, 'PENALTI_PERDIDO')} onClick={() => handlePlayerEvent(player.id, 'PENALTI_PERDIDO')} icon={<Ban size={10} />} colorClass="text-purple-500 bg-purple-500/10 border-purple-500/20" isRemoveMode={isRemoveMode} />
-                                <StatButton count={getPlayerEventCount(player.id, 'PENALTI_SOFRIDO')} onClick={() => handlePlayerEvent(player.id, 'PENALTI_SOFRIDO')} icon={<AlertOctagon size={10} />} colorClass="text-cyan-400 bg-cyan-400/10 border-cyan-400/20" isRemoveMode={isRemoveMode} />
-                                <StatButton count={getPlayerEventCount(player.id, 'PENALTI_COMETIDO')} onClick={() => handlePlayerEvent(player.id, 'PENALTI_COMETIDO')} icon={<AlertOctagon size={10} />} colorClass="text-pink-500 bg-pink-500/10 border-pink-500/20" isRemoveMode={isRemoveMode} />
-                            </div>
-                        )}
-                     </div>
-                   ))}
+                   {sortedPlayers.filter(p => getActiveRoster().includes(p.id)).map(player => {
+                     const playerName = player.name || '';
+                     return (
+                       <div key={player.id}>
+                          <div className="grid grid-cols-[1.5fr_repeat(5,1fr)] gap-1.5 items-center bg-white/[0.02] border border-white/[0.05] p-2 rounded-xl">
+                              <div className="truncate pr-1">
+                                  <p className="text-xs font-bold text-white leading-none truncate">{playerName}</p>
+                                  <p className="text-[8px] text-white/30 uppercase mt-1 font-bold">{player.position.substring(0,3)}</p>
+                              </div>
+                              <StatButton count={getPlayerEventCount(player.id, 'GOL')} onClick={() => handlePlayerEvent(player.id, 'GOL')} colorClass="text-green-500 bg-green-500/10 border-green-500/20 active:bg-green-500 active:text-black" isRemoveMode={isRemoveMode} />
+                              <StatButton count={getPlayerEventCount(player.id, 'ASSIST')} onClick={() => handlePlayerEvent(player.id, 'ASSIST')} icon={<Zap size={10} />} colorClass="text-[#F4BE02] bg-[#F4BE02]/10 border-[#F4BE02]/20 active:bg-[#F4BE02] active:text-black" isRemoveMode={isRemoveMode} />
+                              <StatButton count={getPlayerEventCount(player.id, 'FALTA')} onClick={() => handlePlayerEvent(player.id, 'FALTA')} icon={<ShieldAlert size={10} />} colorClass="text-red-500 bg-red-500/10 border-red-500/20 active:bg-red-500 active:text-white" isRemoveMode={isRemoveMode} />
+                              <StatButton count={getPlayerEventCount(player.id, 'AMARELO')} onClick={() => handlePlayerEvent(player.id, 'AMARELO')} icon={<Square size={10} fill="currentColor" />} colorClass="text-yellow-500 bg-yellow-500/10 border-yellow-500/20 active:bg-yellow-500 active:text-black" isRemoveMode={isRemoveMode} />
+                              
+                              <button 
+                                  onClick={() => setExpandedPlayerId(expandedPlayerId === player.id ? null : player.id)}
+                                  className={`h-10 rounded-lg flex items-center justify-center border transition-all ${expandedPlayerId === player.id ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 text-white/40'}`}
+                              >
+                                  <MoreHorizontal size={14} />
+                              </button>
+                          </div>
+                          
+                          {/* Expanded Stats Row (Cartola) */}
+                          {expandedPlayerId === player.id && (
+                              <div className="mt-1 bg-[#111] rounded-xl p-2 grid grid-cols-6 gap-1 animate-in slide-in-from-top-2">
+                                  <StatButton count={getPlayerEventCount(player.id, 'VERMELHO')} onClick={() => handlePlayerEvent(player.id, 'VERMELHO')} icon={<Square size={10} fill="currentColor" />} colorClass="text-red-700 bg-red-700/10 border-red-700/20 active:bg-red-700 active:text-white" isRemoveMode={isRemoveMode} />
+                                  <StatButton count={getPlayerEventCount(player.id, 'DEFESA_PENALTI')} onClick={() => handlePlayerEvent(player.id, 'DEFESA_PENALTI')} icon={<Hand size={10} />} colorClass="text-blue-400 bg-blue-400/10 border-blue-400/20" isRemoveMode={isRemoveMode} />
+                                  <StatButton count={getPlayerEventCount(player.id, 'GOL_CONTRA')} onClick={() => handlePlayerEvent(player.id, 'GOL_CONTRA')} icon={<Footprints size={10} className="rotate-180" />} colorClass="text-orange-500 bg-orange-500/10 border-orange-500/20" isRemoveMode={isRemoveMode} />
+                                  <StatButton count={getPlayerEventCount(player.id, 'PENALTI_PERDIDO')} onClick={() => handlePlayerEvent(player.id, 'PENALTI_PERDIDO')} icon={<Ban size={10} />} colorClass="text-purple-500 bg-purple-500/10 border-purple-500/20" isRemoveMode={isRemoveMode} />
+                                  <StatButton count={getPlayerEventCount(player.id, 'PENALTI_SOFRIDO')} onClick={() => handlePlayerEvent(player.id, 'PENALTI_SOFRIDO')} icon={<AlertOctagon size={10} />} colorClass="text-cyan-400 bg-cyan-400/10 border-cyan-400/20" isRemoveMode={isRemoveMode} />
+                                  <StatButton count={getPlayerEventCount(player.id, 'PENALTI_COMETIDO')} onClick={() => handlePlayerEvent(player.id, 'PENALTI_COMETIDO')} icon={<AlertOctagon size={10} />} colorClass="text-pink-500 bg-pink-500/10 border-pink-500/20" isRemoveMode={isRemoveMode} />
+                              </div>
+                          )}
+                       </div>
+                     )
+                   })}
                    {players.filter(p => getActiveRoster().includes(p.id)).length === 0 && (
                        <div className="text-center py-10 opacity-30">
                            <p className="text-[10px] uppercase font-bold tracking-widest">Nenhum atleta na escalação</p>

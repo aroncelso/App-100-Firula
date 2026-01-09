@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Trophy, 
@@ -12,7 +13,7 @@ import {
   RefreshCw,
   Crown
 } from 'lucide-react';
-import { ScreenType, Player, Match, Payment, QuadroStats, HalfStats, Expense } from './types';
+import { ScreenType, Player, Match, Payment, Expense } from './types';
 import Dashboard from './screens/Dashboard';
 import Sumulas from './screens/Sumulas';
 import Players from './screens/Players';
@@ -23,96 +24,80 @@ import { api } from './services/sheetApi';
 
 const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<ScreenType>('DASHBOARD');
-  
-  // Start with empty arrays - data will come from Google Sheets
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   
   const [isLoading, setIsLoading] = useState(true);
-  const [fetchError, setFetchError] = useState(false);
-  const [isDataLoaded, setIsDataLoaded] = useState(false); // Controls UI indicator
-  
-  // Ref to track if the initial load is complete. 
-  // We use this to prevent the useEffect hooks from syncing data back to the server 
-  // immediately after we just fetched it.
-  const isSyncEnabled = useRef(false);
+  const [isError, setIsError] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  // --- Initial Fetch ---
+  // Prevention flags
+  const dataLoaded = useRef(false);
+  const skipNextSync = useRef<{ [key: string]: boolean }>({
+    PLAYERS: true,
+    MATCHES: true,
+    PAYMENTS: true,
+    EXPENSES: true
+  });
+
+  // Initial Data Fetch
   useEffect(() => {
-    const loadData = async () => {
-        setIsLoading(true);
-        setFetchError(false);
-        const data = await api.fetchAllData();
+    const init = async () => {
+      setIsLoading(true);
+      const data = await api.fetchAllData();
+      if (data) {
+        // Filter out empty rows that might come from the spreadsheet
+        const cleanPlayers = (data.PLAYERS || []).filter((p: any) => p.id && p.name);
         
-        if (data) {
-            if (data.PLAYERS) setPlayers(data.PLAYERS);
-            if (data.MATCHES) setMatches(data.MATCHES);
-            if (data.EXPENSES) setExpenses(data.EXPENSES);
-            if (data.PAYMENTS) setPayments(data.PAYMENTS);
-            
-            setIsDataLoaded(true);
-            
-            // Enable sync after a short delay to ensure initial state render doesn't trigger it
-            setTimeout(() => {
-                isSyncEnabled.current = true;
-            }, 1500);
-        } else {
-            setFetchError(true);
-        }
+        setPlayers(cleanPlayers);
+        setMatches(data.MATCHES || []);
+        setPayments(data.PAYMENTS || []);
+        setExpenses(data.EXPENSES || []);
         
-        setIsLoading(false);
+        // Mark as loaded and prevent immediate sync back
+        dataLoaded.current = true;
+        setIsError(false);
+      } else {
+        setIsError(true);
+      }
+      setIsLoading(false);
     };
-    loadData();
+    init();
   }, []);
+
+  // Sync Logic
+  const sync = async (type: string, data: any[]) => {
+    if (!dataLoaded.current) return;
+    
+    // If this is the first change after load, skip it to avoid "echo" sync
+    if (skipNextSync.current[type]) {
+      skipNextSync.current[type] = false;
+      return;
+    }
+
+    setIsSyncing(true);
+    await api.syncData(type as any, data);
+    // Tiny delay to show the "Saving" indicator to user
+    setTimeout(() => setIsSyncing(false), 1000);
+  };
+
+  useEffect(() => { sync('PLAYERS', players); }, [players]);
+  useEffect(() => { sync('MATCHES', matches); }, [matches]);
+  useEffect(() => { sync('PAYMENTS', payments); }, [payments]);
+  useEffect(() => { sync('EXPENSES', expenses); }, [expenses]);
 
   const addPlayer = (newPlayer: Player) => {
     setPlayers(prev => [...prev, newPlayer]);
     setPayments(prev => [...prev, {
       playerId: newPlayer.id,
-      month: 'Novembro',
+      month: new Date().toLocaleString('pt-BR', { month: 'long' }),
       status: 'Pendente',
       value: 50.00
     }]);
     setCurrentScreen('JOGADORES');
   };
-
-  // --- Auto Sync Effects ---
-  // Using isSyncEnabled.current ensures we only save when the USER makes changes, not when the app loads.
-
-  useEffect(() => {
-    if (!isSyncEnabled.current) return;
-    const timeout = setTimeout(() => {
-        api.syncPlayers(players);
-    }, 2000);
-    return () => clearTimeout(timeout);
-  }, [players]);
-
-  useEffect(() => {
-    if (!isSyncEnabled.current) return;
-    const timeout = setTimeout(() => {
-        api.syncMatches(matches);
-    }, 2000);
-    return () => clearTimeout(timeout);
-  }, [matches]);
-
-  useEffect(() => {
-    if (!isSyncEnabled.current) return;
-    const timeout = setTimeout(() => {
-        api.syncPayments(payments);
-    }, 2000);
-    return () => clearTimeout(timeout);
-  }, [payments]);
-
-  useEffect(() => {
-    if (!isSyncEnabled.current) return;
-    const timeout = setTimeout(() => {
-        api.syncExpenses(expenses);
-    }, 2000);
-    return () => clearTimeout(timeout);
-  }, [expenses]);
-
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -127,142 +112,67 @@ const App: React.FC = () => {
   };
 
   if (isLoading) {
-      return (
-          <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4 text-white">
-              <div className="relative">
-                 <div className="absolute inset-0 bg-[#F4BE02] blur-[20px] opacity-20 rounded-full animate-pulse"></div>
-                 <img src="https://i.postimg.cc/tR3cPQZd/100-firula-II-removebg-preview.png" className="w-20 h-20 rounded-full border border-[#F4BE02]/30 relative z-10 animate-bounce" />
-              </div>
-              <div className="flex items-center gap-2 text-[#F4BE02]">
-                  <Loader2 className="animate-spin" />
-                  <span className="font-black uppercase tracking-widest text-xs">Sincronizando Dados...</span>
-              </div>
-          </div>
-      )
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-6">
+        <img src="https://i.postimg.cc/tR3cPQZd/100-firula-II-removebg-preview.png" className="w-24 h-24 animate-bounce" />
+        <div className="flex items-center gap-3 text-[#F4BE02]">
+          <Loader2 className="animate-spin" size={20} />
+          <span className="font-display font-bold text-sm uppercase tracking-widest">Sincronizando Elenco...</span>
+        </div>
+      </div>
+    );
   }
 
-  if (fetchError) {
+  if (isError) {
     return (
-        <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-6 text-white p-8 text-center animate-in fade-in">
-            <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/20">
-                <WifiOff size={32} className="text-red-500" />
-            </div>
-            <div>
-                <h2 className="text-2xl font-display font-bold text-white mb-2">Erro de Conexão</h2>
-                <p className="text-sm text-white/60 leading-relaxed max-w-xs mx-auto">
-                    Não foi possível carregar os dados da planilha.
-                </p>
-                <div className="mt-4 p-4 bg-white/5 rounded-xl border border-white/10 text-xs text-white/40 text-left">
-                    <p className="font-bold text-white/60 mb-1">Soluções possíveis:</p>
-                    <ul className="list-disc pl-4 space-y-1">
-                        <li>Verifique sua conexão com a internet.</li>
-                        <li>Confirme se o Script Google está implantado como <strong>"Qualquer pessoa" (Anyone)</strong>.</li>
-                    </ul>
-                </div>
-            </div>
-            <button 
-                onClick={() => window.location.reload()} 
-                className="flex items-center gap-2 px-8 py-4 bg-[#F4BE02] text-black rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-105 transition-transform shadow-xl shadow-[#F4BE02]/20"
-            >
-                <RefreshCw size={16} /> Tentar Novamente
-            </button>
-        </div>
-    )
-}
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-8 text-center">
+        <WifiOff size={48} className="text-red-500 mb-4" />
+        <h2 className="text-2xl font-display font-bold mb-2">Erro de Conexão</h2>
+        <p className="text-white/40 text-sm mb-8">Não foi possível carregar os dados. Verifique sua planilha e o script.</p>
+        <button onClick={() => window.location.reload()} className="bg-[#F4BE02] text-black px-8 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center gap-2">
+          <RefreshCw size={18} /> Tentar Novamente
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-black text-white pb-32">
       <header className="sticky top-0 z-50 glass px-6 py-5 flex items-center justify-between border-b border-white/[0.03]">
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <div className="absolute inset-0 bg-[#F4BE02] blur-[8px] opacity-20 rounded-full animate-pulse"></div>
-            <img 
-              src="https://i.postimg.cc/tR3cPQZd/100-firula-II-removebg-preview.png" 
-              alt="100 Firula Logo" 
-              className="w-10 h-10 rounded-full border border-[#F4BE02]/40 relative z-10"
-            />
-          </div>
+        <div className="flex items-center gap-3">
+          <img src="https://i.postimg.cc/tR3cPQZd/100-firula-II-removebg-preview.png" alt="Logo" className="w-10 h-10" />
           <div>
-            <h1 className="text-xl font-display font-bold leading-none tracking-tight">
-              100<span className="text-[#F4BE02]">FIRULA</span>
-            </h1>
-            <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/40 mt-1">Management App</p>
+            <h1 className="text-lg font-display font-bold leading-none">100<span className="text-[#F4BE02]">FIRULA</span></h1>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-white/30">Management App</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-            <div className={`flex items-center gap-1 px-2 py-1 rounded-full border transition-colors ${isDataLoaded ? 'bg-green-500/10 border-green-500/20' : 'bg-yellow-500/10 border-yellow-500/20'}`}>
-                <CloudLightning size={10} className={isDataLoaded ? "text-green-500" : "text-yellow-500"} />
-                <span className={`text-[8px] font-black uppercase tracking-wider ${isDataLoaded ? "text-green-500/60" : "text-yellow-500/60"}`}>
-                    {isDataLoaded ? 'Sync On' : 'Offline'}
-                </span>
-            </div>
-            <button className="w-10 h-10 rounded-full bg-white/[0.05] border border-white/[0.08] flex items-center justify-center text-white/60 hover:text-white transition-colors">
-            <Bell size={18} />
-            </button>
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all ${isSyncing ? 'bg-yellow-500/10 border-yellow-500/20' : 'bg-green-500/10 border-green-500/20'}`}>
+            <CloudLightning size={12} className={isSyncing ? 'text-yellow-500 animate-pulse' : 'text-green-500'} />
+            <span className={`text-[9px] font-black uppercase ${isSyncing ? 'text-yellow-500' : 'text-green-500'}`}>
+              {isSyncing ? 'Salvando...' : 'Cloud OK'}
+            </span>
+          </div>
         </div>
       </header>
 
-      <main className="flex-1 px-5 pt-6 animate-in fade-in duration-500">
-        {renderScreen()}
-      </main>
+      <main className="flex-1 px-5 pt-6">{renderScreen()}</main>
 
-      <nav className="fixed bottom-6 left-5 right-5 z-50 bg-[#262626] rounded-3xl border border-white/20 px-2 py-2 flex justify-between items-center safe-bottom shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
-        <NavButton 
-          active={currentScreen === 'DASHBOARD'} 
-          onClick={() => setCurrentScreen('DASHBOARD')}
-          icon={<LayoutDashboard size={20} />}
-          label="Início"
-        />
-        <NavButton 
-          active={currentScreen === 'SUMULAS'} 
-          onClick={() => setCurrentScreen('SUMULAS')}
-          icon={<FileText size={20} />}
-          label="Súmulas"
-        />
-        <NavButton 
-          active={currentScreen === 'CARTOLA'} 
-          onClick={() => setCurrentScreen('CARTOLA')}
-          icon={<Crown size={20} />}
-          label="Cartola"
-        />
-        <NavButton 
-          active={currentScreen === 'JOGADORES' || currentScreen === 'CADASTRO_JOGADOR'} 
-          onClick={() => setCurrentScreen('JOGADORES')}
-          icon={<Users size={20} />}
-          label="Elenco"
-        />
-        <NavButton 
-          active={currentScreen === 'FINANCEIRO'} 
-          onClick={() => setCurrentScreen('FINANCEIRO')}
-          icon={<DollarSign size={20} />}
-          label="Caixa"
-        />
+      <nav className="fixed bottom-6 left-5 right-5 z-50 bg-[#151515] rounded-[28px] border border-white/10 p-2 flex justify-between shadow-2xl backdrop-blur-xl">
+        <NavBtn active={currentScreen === 'DASHBOARD'} onClick={() => setCurrentScreen('DASHBOARD')} icon={<LayoutDashboard size={20} />} label="Início" />
+        <NavBtn active={currentScreen === 'SUMULAS'} onClick={() => setCurrentScreen('SUMULAS'} icon={<FileText size={20} />} label="Súmulas" />
+        <NavBtn active={currentScreen === 'CARTOLA'} onClick={() => setCurrentScreen('CARTOLA'} icon={<Crown size={20} />} label="Ranking" />
+        <NavBtn active={currentScreen === 'JOGADORES' || currentScreen === 'CADASTRO_JOGADOR'} onClick={() => setCurrentScreen('JOGADORES')} icon={<Users size={20} />} label="Elenco" />
+        <NavBtn active={currentScreen === 'FINANCEIRO'} onClick={() => setCurrentScreen('FINANCEIRO'} icon={<DollarSign size={20} />} label="Caixa" />
       </nav>
     </div>
   );
 };
 
-interface NavButtonProps {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  label: string;
-}
-
-const NavButton: React.FC<NavButtonProps> = ({ active, onClick, icon, label }) => (
-  <button 
-    onClick={onClick}
-    className={`flex flex-col items-center justify-center flex-1 py-2 px-1 rounded-2xl transition-all duration-300 relative ${active ? 'text-[#F4BE02]' : 'text-white/40'}`}
-  >
-    <div className={`transition-transform duration-300 ${active ? 'scale-110 -translate-y-0.5' : 'scale-100'}`}>
-      {icon}
-    </div>
-    <span className={`text-[8px] font-bold uppercase tracking-wider mt-1 transition-opacity duration-300 ${active ? 'opacity-100' : 'opacity-60'}`}>
-      {label}
-    </span>
-    {active && (
-      <div className="absolute -bottom-1 w-5 h-[2px] bg-[#F4BE02] rounded-full shadow-[0_0_8px_#F4BE02]"></div>
-    )}
+const NavBtn = ({ active, onClick, icon, label }: any) => (
+  <button onClick={onClick} className={`flex flex-col items-center justify-center flex-1 py-3 rounded-2xl transition-all ${active ? 'text-[#F4BE02] bg-white/5' : 'text-white/30'}`}>
+    {icon}
+    <span className="text-[8px] font-black uppercase mt-1 tracking-widest">{label}</span>
   </button>
 );
 

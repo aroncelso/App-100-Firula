@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Player, Payment, Expense } from '../types';
 import { Wallet, CheckCircle, AlertCircle, TrendingUp, TrendingDown, Plus, Banknote, Calendar, Receipt } from 'lucide-react';
@@ -150,6 +149,7 @@ const Finance: React.FC<Props> = ({ payments, players, setPayments, expenses, se
               {players.map(player => {
                 const payment = payments.find(p => p.playerId === player.id);
                 const isPaid = payment?.status === 'Pago';
+                const playerName = player.name || '';
 
                 return (
                   <div 
@@ -162,10 +162,10 @@ const Finance: React.FC<Props> = ({ payments, players, setPayments, expenses, se
                           ? 'bg-green-500/10 border-green-500/20 text-green-500' 
                           : 'bg-[#E70205]/10 border-[#E70205]/20 text-[#E70205]'}`}
                       >
-                        {player.name.charAt(0)}
+                        {playerName.charAt(0) || '?'}
                       </div>
                       <div>
-                        <h4 className="font-bold text-sm tracking-tight">{player.name}</h4>
+                        <h4 className="font-bold text-sm tracking-tight">{playerName}</h4>
                         <div className="flex items-center gap-1.5 mt-0.5">
                            <span className={`w-1.5 h-1.5 rounded-full ${isPaid ? 'bg-green-500' : 'bg-[#E70205]'}`}></span>
                            <p className="text-[9px] text-white/20 uppercase font-black tracking-widest">R$ {payment?.value.toFixed(2)}</p>
