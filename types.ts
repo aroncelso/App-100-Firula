@@ -10,7 +10,17 @@ export interface Player {
   redCards: number;
 }
 
-export type EventType = 'GOL' | 'ASSIST' | 'AMARELO' | 'VERMELHO' | 'FALTA';
+export type EventType = 
+  'GOL' | 
+  'ASSIST' | 
+  'AMARELO' | 
+  'VERMELHO' | 
+  'FALTA' | 
+  'DEFESA_PENALTI' | 
+  'GOL_CONTRA' | 
+  'PENALTI_PERDIDO' | 
+  'PENALTI_SOFRIDO' | 
+  'PENALTI_COMETIDO';
 
 export interface MatchEvent {
   id: string;
@@ -60,4 +70,4 @@ export interface Expense {
   category?: string;
 }
 
-export type ScreenType = 'DASHBOARD' | 'SUMULAS' | 'JOGADORES' | 'FINANCEIRO' | 'CADASTRO_JOGADOR';
+export type ScreenType = 'DASHBOARD' | 'SUMULAS' | 'JOGADORES' | 'FINANCEIRO' | 'CADASTRO_JOGADOR' | 'CARTOLA';

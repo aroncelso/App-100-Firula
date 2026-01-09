@@ -9,7 +9,8 @@ import {
   CloudLightning,
   Loader2,
   WifiOff,
-  RefreshCw
+  RefreshCw,
+  Crown
 } from 'lucide-react';
 import { ScreenType, Player, Match, Payment, QuadroStats, HalfStats, Expense } from './types';
 import Dashboard from './screens/Dashboard';
@@ -17,6 +18,7 @@ import Sumulas from './screens/Sumulas';
 import Players from './screens/Players';
 import Finance from './screens/Finance';
 import PlayerForm from './screens/PlayerForm';
+import Cartola from './screens/Cartola';
 import { api } from './services/sheetApi';
 
 const App: React.FC = () => {
@@ -111,6 +113,7 @@ const App: React.FC = () => {
       case 'JOGADORES': return <Players players={players} matches={matches} onAddPlayer={() => setCurrentScreen('CADASTRO_JOGADOR')} />;
       case 'FINANCEIRO': return <Finance payments={payments} players={players} setPayments={setPayments} expenses={expenses} setExpenses={setExpenses} />;
       case 'CADASTRO_JOGADOR': return <PlayerForm onSave={addPlayer} onCancel={() => setCurrentScreen('JOGADORES')} />;
+      case 'CARTOLA': return <Cartola players={players} matches={matches} />;
       default: return <Dashboard players={players} matches={matches} />;
     }
   };
@@ -199,26 +202,32 @@ const App: React.FC = () => {
         <NavButton 
           active={currentScreen === 'DASHBOARD'} 
           onClick={() => setCurrentScreen('DASHBOARD')}
-          icon={<LayoutDashboard size={22} />}
+          icon={<LayoutDashboard size={20} />}
           label="Início"
         />
         <NavButton 
           active={currentScreen === 'SUMULAS'} 
           onClick={() => setCurrentScreen('SUMULAS')}
-          icon={<FileText size={22} />}
+          icon={<FileText size={20} />}
           label="Súmulas"
+        />
+        <NavButton 
+          active={currentScreen === 'CARTOLA'} 
+          onClick={() => setCurrentScreen('CARTOLA')}
+          icon={<Crown size={20} />}
+          label="Cartola"
         />
         <NavButton 
           active={currentScreen === 'JOGADORES' || currentScreen === 'CADASTRO_JOGADOR'} 
           onClick={() => setCurrentScreen('JOGADORES')}
-          icon={<Users size={22} />}
+          icon={<Users size={20} />}
           label="Elenco"
         />
         <NavButton 
           active={currentScreen === 'FINANCEIRO'} 
           onClick={() => setCurrentScreen('FINANCEIRO')}
-          icon={<DollarSign size={22} />}
-          label="Financeiro"
+          icon={<DollarSign size={20} />}
+          label="Caixa"
         />
       </nav>
     </div>
@@ -240,7 +249,7 @@ const NavButton: React.FC<NavButtonProps> = ({ active, onClick, icon, label }) =
     <div className={`transition-transform duration-300 ${active ? 'scale-110 -translate-y-0.5' : 'scale-100'}`}>
       {icon}
     </div>
-    <span className={`text-[9px] font-bold uppercase tracking-wider mt-1 transition-opacity duration-300 ${active ? 'opacity-100' : 'opacity-60'}`}>
+    <span className={`text-[8px] font-bold uppercase tracking-wider mt-1 transition-opacity duration-300 ${active ? 'opacity-100' : 'opacity-60'}`}>
       {label}
     </span>
     {active && (
