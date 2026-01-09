@@ -38,6 +38,7 @@ export interface Match {
   label: 'Quadro 1' | 'Quadro 2'; // Identifies which team played
   stats: QuadroStats; // Contains stats for this specific game
   notes: string;
+  coach?: string; // New: Coach name
   isFriendly?: boolean; // New: If true, points = 0
   wo?: 'none' | 'win' | 'loss'; // New: Walkover status
   playerRatings?: Record<string, number>; // New: playerId -> score (1-10)

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Match, Player, EventType, MatchEvent, QuadroStats, HalfStats } from '../types';
-import { Plus, X, Calendar, Eraser, Save, Minus, CheckCircle2, Pencil, Handshake, Flag, Trophy, Star, ChevronLeft, ChevronRight, Crown, Users, Check, CheckSquare } from 'lucide-react';
+import { Plus, X, Calendar, Eraser, Save, Minus, CheckCircle2, Pencil, Handshake, Flag, Trophy, Star, ChevronLeft, ChevronRight, Crown, Users, Check, CheckSquare, UserCog } from 'lucide-react';
 import { ShieldAlert, Zap, Square } from 'lucide-react';
 
 interface Props {
@@ -21,6 +21,7 @@ interface FormState {
     quadro2: QuadroStats;
     rosterQ1: string[]; // IDs of players in Quadro 1
     rosterQ2: string[]; // IDs of players in Quadro 2
+    coach: string; // New: Coach name
     editingLabel?: 'Quadro 1' | 'Quadro 2';
     // Settings specific to the active view/editing
     isFriendly: boolean;
@@ -61,6 +62,7 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
     quadro2: { tempo1: createEmptyHalf(), tempo2: createEmptyHalf() },
     rosterQ1: [],
     rosterQ2: [],
+    coach: '',
     isFriendly: false,
     wo: 'none'
   });
@@ -74,6 +76,7 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
         quadro2: { tempo1: createEmptyHalf(), tempo2: createEmptyHalf() },
         rosterQ1: [], // Start empty
         rosterQ2: [], // Start empty
+        coach: '',
         isFriendly: false,
         wo: 'none'
     });
@@ -96,6 +99,7 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
         // Use existing roster or empty if undefined
         rosterQ1: isQ1 && match.roster ? match.roster : [],
         rosterQ2: !isQ1 && match.roster ? match.roster : [],
+        coach: match.coach || '',
         isFriendly: match.isFriendly || false,
         wo: match.wo || 'none'
     });
@@ -279,7 +283,8 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
       stats: statsToSave,
       isFriendly: formMatch.isFriendly,
       wo: formMatch.wo,
-      roster: rosterToSave
+      roster: rosterToSave,
+      coach: formMatch.coach
     };
 
     if (formMatch.id && formMatch.editingLabel === labelToSave) {
@@ -401,6 +406,20 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
                   </div>
               </div>
               
+              {/* COACH INPUT FIELD */}
+              <div className="p-4 bg-[#111] border-b border-white/5">
+                 <label className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1 block">Técnico Responsável</label>
+                 <div className="flex items-center gap-2 bg-white/5 rounded-xl p-3 border border-white/5 focus-within:border-[#F4BE02]/50 transition-colors">
+                    <UserCog size={16} className="text-white/30" />
+                    <input 
+                        className="bg-transparent w-full text-sm font-bold text-white outline-none placeholder:text-white/20"
+                        placeholder="Nome do Técnico"
+                        value={formMatch.coach}
+                        onChange={(e) => setFormMatch(prev => ({...prev, coach: e.target.value}))}
+                    />
+                 </div>
+              </div>
+
               <div className="flex-1 overflow-y-auto p-4 space-y-2">
                  {sortedPlayers.map(p => {
                      const isSelected = getActiveRoster().includes(p.id);
@@ -686,6 +705,14 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
                                     <span className="text-[8px] font-black text-white/80 uppercase tracking-wider truncate max-w-[100px]">
                                         {mvpName}
                                     </span>
+                                </div>
+                            )}
+
+                             {/* Coach Badge */}
+                            {match.coach && (
+                                <div className="flex items-center gap-1 mt-1">
+                                    <UserCog size={10} className="text-white/40" />
+                                    <span className="text-[9px] font-bold text-white/40 uppercase tracking-wider">{match.coach}</span>
                                 </div>
                             )}
                         </div>

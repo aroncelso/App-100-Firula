@@ -23,6 +23,7 @@ const CONFIGS = {
       { key: 'label', header: 'Quadro' },
       // Colunas visuais (para leitura humana na planilha)
       { key: 'score_display', header: 'Placar (Visual)', type: 'visual' }, 
+      { key: 'coach', header: 'Técnico' },
       { key: 'isFriendly', header: 'Amistoso?', type: 'boolean' },
       { key: 'wo', header: 'W.O.' },
       { key: 'notes', header: 'Obs' },

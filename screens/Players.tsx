@@ -19,7 +19,12 @@ const Players: React.FC<Props> = ({ players, matches, onAddPlayer }) => {
 
   // Extract available years from matches
   const availableYears = useMemo(() => {
-    const years = new Set(matches.map(m => m.date.split('-')[0]));
+    const years = new Set<string>();
+    matches.forEach(m => {
+        if (m.date) {
+            years.add(m.date.split('-')[0]);
+        }
+    });
     years.add(currentYear); // Ensure current year is always an option
     return Array.from(years).sort().reverse();
   }, [matches, currentYear]);
@@ -74,6 +79,8 @@ const Players: React.FC<Props> = ({ players, matches, onAddPlayer }) => {
 
     matches.forEach(match => {
       // --- FILTERS CHECK ---
+      if (!match.date) return;
+      
       const matchYear = match.date.split('-')[0];
       if (matchYear !== selectedYear) return; // Filter by Year
 
