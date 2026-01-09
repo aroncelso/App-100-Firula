@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { 
   Trophy, 
@@ -7,7 +6,10 @@ import {
   FileText, 
   LayoutDashboard,
   Bell,
-  CloudLightning
+  CloudLightning,
+  Loader2,
+  WifiOff,
+  RefreshCw
 } from 'lucide-react';
 import { ScreenType, Player, Match, Payment, QuadroStats, HalfStats, Expense } from './types';
 import Dashboard from './screens/Dashboard';
@@ -17,69 +19,49 @@ import Finance from './screens/Finance';
 import PlayerForm from './screens/PlayerForm';
 import { api } from './services/sheetApi';
 
-const createEmptyHalf = (): HalfStats => ({ fouls: 0, opponentGoals: 0, opponentFouls: 0, events: [] });
-const createEmptyQuadro = (): QuadroStats => ({ 
-  tempo1: createEmptyHalf(), 
-  tempo2: createEmptyHalf() 
-});
-
-const INITIAL_PLAYERS: Player[] = [
-  { id: '1', name: 'Zezinho', position: 'Atacante', goals: 12, assists: 5, matchesPlayed: 8, yellowCards: 2, redCards: 0 },
-  { id: '2', name: 'Ricardinho', position: 'Meio-Campo', goals: 4, assists: 15, matchesPlayed: 8, yellowCards: 1, redCards: 0 },
-  { id: '3', name: 'Tão', position: 'Zagueiro', goals: 1, assists: 2, matchesPlayed: 7, yellowCards: 4, redCards: 1 },
-  { id: '4', name: 'Giba', position: 'Goleiro', goals: 0, assists: 1, matchesPlayed: 8, yellowCards: 0, redCards: 0 },
-];
-
-const INITIAL_MATCHES: Match[] = [
-  { 
-    id: 'm1', 
-    date: '2023-10-20', 
-    opponent: 'Amigos do Copo', 
-    label: 'Quadro 2',
-    notes: 'Jogo corrido, calor forte.',
-    stats: {
-      tempo1: { fouls: 3, opponentGoals: 0, opponentFouls: 0, events: [{ id: 'e1', playerId: '1', type: 'GOL' }] },
-      tempo2: { fouls: 5, opponentGoals: 2, opponentFouls: 0, events: [{ id: 'e2', playerId: '2', type: 'GOL' }] }
-    }
-  },
-  { 
-    id: 'm2', 
-    date: '2023-10-20', 
-    opponent: 'Amigos do Copo', 
-    label: 'Quadro 1',
-    notes: 'Vitória apertada.',
-    stats: {
-      tempo1: { fouls: 2, opponentGoals: 1, opponentFouls: 0, events: [{ id: 'e3', playerId: '1', type: 'GOL' }] },
-      tempo2: { fouls: 1, opponentGoals: 0, opponentFouls: 0, events: [] }
-    }
-  },
-];
-
-const INITIAL_PAYMENTS: Payment[] = INITIAL_PLAYERS.map(p => ({
-  playerId: p.id,
-  month: 'Novembro',
-  status: Math.random() > 0.3 ? 'Pago' : 'Pendente',
-  value: 50.00
-}));
-
-const INITIAL_EXPENSES: Expense[] = [
-  { id: 'ex1', description: 'Aluguel do Campo', value: 250.00, date: '2023-11-01', category: 'Campo' },
-  { id: 'ex2', description: 'Água e Gelo', value: 35.00, date: '2023-11-01', category: 'Insumos' }
-];
-
 const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<ScreenType>('DASHBOARD');
-  const [players, setPlayers] = useState<Player[]>(INITIAL_PLAYERS);
-  const [matches, setMatches] = useState<Match[]>(INITIAL_MATCHES);
-  const [payments, setPayments] = useState<Payment[]>(INITIAL_PAYMENTS);
-  const [expenses, setExpenses] = useState<Expense[]>(INITIAL_EXPENSES);
-  const [isSyncing, setIsSyncing] = useState(false);
+  
+  // Start with empty arrays - data will come from Google Sheets
+  const [players, setPlayers] = useState<Player[]>([]);
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  
+  const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
+  const [isDataLoaded, setIsDataLoaded] = useState(false); // Controls when auto-sync can start
+
+  // --- Initial Fetch ---
+  useEffect(() => {
+    const loadData = async () => {
+        setIsLoading(true);
+        setFetchError(false);
+        const data = await api.fetchAllData();
+        
+        if (data) {
+            if (data.PLAYERS) setPlayers(data.PLAYERS);
+            if (data.MATCHES) setMatches(data.MATCHES);
+            if (data.EXPENSES) setExpenses(data.EXPENSES);
+            if (data.PAYMENTS) setPayments(data.PAYMENTS);
+            
+            // Allow sync only after data is successfully loaded
+            // This prevents overwriting the cloud database with empty local state on error
+            setTimeout(() => setIsDataLoaded(true), 1000); 
+        } else {
+            setFetchError(true);
+        }
+        
+        setIsLoading(false);
+    };
+    loadData();
+  }, []);
 
   const addPlayer = (newPlayer: Player) => {
     setPlayers(prev => [...prev, newPlayer]);
     setPayments(prev => [...prev, {
       playerId: newPlayer.id,
-      month: 'Novembro',
+      month: 'Novembro', // You might want to make this dynamic
       status: 'Pendente',
       value: 50.00
     }]);
@@ -87,36 +69,39 @@ const App: React.FC = () => {
   };
 
   // --- Auto Sync Effects ---
-  // Debounce logic is ideal here, but for simplicity we sync on change.
-  // The 'no-cors' mode means we don't get a response, so we just fire and forget.
+  // Only run sync if data has been successfully loaded first (SAFETY CHECK)
   
   useEffect(() => {
+    if (!isDataLoaded) return;
     const timeout = setTimeout(() => {
         api.syncPlayers(players);
     }, 2000);
     return () => clearTimeout(timeout);
-  }, [players]);
+  }, [players, isDataLoaded]);
 
   useEffect(() => {
+    if (!isDataLoaded) return;
     const timeout = setTimeout(() => {
         api.syncMatches(matches);
     }, 2000);
     return () => clearTimeout(timeout);
-  }, [matches]);
+  }, [matches, isDataLoaded]);
 
   useEffect(() => {
+    if (!isDataLoaded) return;
     const timeout = setTimeout(() => {
         api.syncPayments(payments);
     }, 2000);
     return () => clearTimeout(timeout);
-  }, [payments]);
+  }, [payments, isDataLoaded]);
 
   useEffect(() => {
+    if (!isDataLoaded) return;
     const timeout = setTimeout(() => {
         api.syncExpenses(expenses);
     }, 2000);
     return () => clearTimeout(timeout);
-  }, [expenses]);
+  }, [expenses, isDataLoaded]);
 
 
   const renderScreen = () => {
@@ -129,6 +114,50 @@ const App: React.FC = () => {
       default: return <Dashboard players={players} matches={matches} />;
     }
   };
+
+  if (isLoading) {
+      return (
+          <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-4 text-white">
+              <div className="relative">
+                 <div className="absolute inset-0 bg-[#F4BE02] blur-[20px] opacity-20 rounded-full animate-pulse"></div>
+                 <img src="https://i.postimg.cc/JhsJShYM/100_firula_II.jpg" className="w-20 h-20 rounded-full border border-[#F4BE02]/30 relative z-10 animate-bounce" />
+              </div>
+              <div className="flex items-center gap-2 text-[#F4BE02]">
+                  <Loader2 className="animate-spin" />
+                  <span className="font-black uppercase tracking-widest text-xs">Sincronizando Dados...</span>
+              </div>
+          </div>
+      )
+  }
+
+  if (fetchError) {
+    return (
+        <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-6 text-white p-8 text-center animate-in fade-in">
+            <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/20">
+                <WifiOff size={32} className="text-red-500" />
+            </div>
+            <div>
+                <h2 className="text-2xl font-display font-bold text-white mb-2">Erro de Conexão</h2>
+                <p className="text-sm text-white/60 leading-relaxed max-w-xs mx-auto">
+                    Não foi possível carregar os dados da planilha.
+                </p>
+                <div className="mt-4 p-4 bg-white/5 rounded-xl border border-white/10 text-xs text-white/40 text-left">
+                    <p className="font-bold text-white/60 mb-1">Soluções possíveis:</p>
+                    <ul className="list-disc pl-4 space-y-1">
+                        <li>Verifique sua conexão com a internet.</li>
+                        <li>Confirme se o Script Google está implantado como <strong>"Qualquer pessoa" (Anyone)</strong>.</li>
+                    </ul>
+                </div>
+            </div>
+            <button 
+                onClick={() => window.location.reload()} 
+                className="flex items-center gap-2 px-8 py-4 bg-[#F4BE02] text-black rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-105 transition-transform shadow-xl shadow-[#F4BE02]/20"
+            >
+                <RefreshCw size={16} /> Tentar Novamente
+            </button>
+        </div>
+    )
+}
 
   return (
     <div className="flex flex-col min-h-screen bg-black text-white pb-32">
@@ -150,9 +179,11 @@ const App: React.FC = () => {
           </div>
         </div>
         <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1 bg-white/[0.03] px-2 py-1 rounded-full border border-white/5">
-                <CloudLightning size={10} className="text-green-500" />
-                <span className="text-[8px] font-black uppercase tracking-wider text-white/40">Sync On</span>
+            <div className={`flex items-center gap-1 px-2 py-1 rounded-full border transition-colors ${isDataLoaded ? 'bg-green-500/10 border-green-500/20' : 'bg-yellow-500/10 border-yellow-500/20'}`}>
+                <CloudLightning size={10} className={isDataLoaded ? "text-green-500" : "text-yellow-500"} />
+                <span className={`text-[8px] font-black uppercase tracking-wider ${isDataLoaded ? "text-green-500/60" : "text-yellow-500/60"}`}>
+                    {isDataLoaded ? 'Sync On' : 'Offline'}
+                </span>
             </div>
             <button className="w-10 h-10 rounded-full bg-white/[0.05] border border-white/[0.08] flex items-center justify-center text-white/60 hover:text-white transition-colors">
             <Bell size={18} />

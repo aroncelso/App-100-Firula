@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Match, Player, EventType, MatchEvent, QuadroStats, HalfStats } from '../types';
 import { Plus, X, Calendar, Eraser, Save, Minus, CheckCircle2, Pencil, Handshake, Flag, Trophy, Star, ChevronLeft, ChevronRight, Crown, Users, Check, CheckSquare } from 'lucide-react';
@@ -45,7 +44,11 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
   
   // Sort players alphabetically
   const sortedPlayers = useMemo(() => {
-    return [...players].sort((a, b) => a.name.localeCompare(b.name));
+    return [...players].sort((a, b) => {
+        const nameA = a.name || '';
+        const nameB = b.name || '';
+        return nameA.localeCompare(nameB);
+    });
   }, [players]);
 
   const allPlayerIds = useMemo(() => sortedPlayers.map(p => p.id), [sortedPlayers]);

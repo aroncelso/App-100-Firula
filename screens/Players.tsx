@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Player, Match } from '../types';
 import { Target, Shield, Zap, Search, UserPlus, Users, Crown, Star, Square, ShieldAlert, Swords, Filter, Calendar, Check, Layers, User } from 'lucide-react';
@@ -27,8 +26,12 @@ const Players: React.FC<Props> = ({ players, matches, onAddPlayer }) => {
 
   const filteredPlayers = useMemo(() => {
     return players
-      .filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()))
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .filter(p => (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()))
+      .sort((a, b) => {
+        const nameA = a.name || '';
+        const nameB = b.name || '';
+        return nameA.localeCompare(nameB);
+      });
   }, [players, searchTerm]);
 
   const getPositionStyle = (pos: Player['position']) => {
@@ -265,7 +268,7 @@ const Players: React.FC<Props> = ({ players, matches, onAddPlayer }) => {
                   <div className="flex items-center gap-4">
                     <div className="relative">
                       <div className="w-12 h-12 bg-white/[0.02] border border-white/[0.08] rounded-xl flex items-center justify-center font-display font-bold text-lg text-white/80">
-                        {player.name.charAt(0)}
+                        {player.name ? player.name.charAt(0) : '?'}
                       </div>
                       <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-md ${style.bg} ${style.text} flex items-center justify-center text-[9px] font-black border border-white/5`}>
                         {style.char}
@@ -301,7 +304,7 @@ const Players: React.FC<Props> = ({ players, matches, onAddPlayer }) => {
                   <div className="flex items-center gap-4 mb-5 border-b border-white/5 pb-4">
                     <div className="relative">
                       <div className="w-12 h-12 bg-white/[0.02] border border-white/[0.08] rounded-xl flex items-center justify-center font-display font-bold text-lg">
-                        {player.name.charAt(0)}
+                        {player.name ? player.name.charAt(0) : '?'}
                       </div>
                       <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-md ${style.bg} ${style.text} flex items-center justify-center text-[9px] font-black border border-white/5`}>
                         {style.char}
