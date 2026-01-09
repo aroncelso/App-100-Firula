@@ -1,0 +1,7 @@
+{
+  "name": "100 Firula Society Manager",
+  "description": "App completo para gestão de times de society com súmulas, estatísticas e financeiro, seguindo a identidade visual do time.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
