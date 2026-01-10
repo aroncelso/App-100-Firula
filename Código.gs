@@ -1,7 +1,7 @@
 
 /**
  * 100 FIRULA SOCIETY - DATABASE ENGINE
- * Definitive version for robust data sync.
+ * Versão otimizada para garantir cabeçalhos e persistência.
  */
 
 const CONFIG = {
@@ -30,6 +30,10 @@ function doGet(e) {
     
     if (data.length <= 1) {
       db[key] = [];
+      // Se a planilha estiver vazia, aproveita e coloca o cabeçalho
+      if (data.length === 0 || data[0].length === 0) {
+        sheet.appendRow(CONFIG.MAPPING[key]);
+      }
       return;
     }
 
@@ -70,45 +74,37 @@ function doGet(e) {
 function doPost(e) {
   const lock = LockService.getScriptLock();
   try {
-    if (!lock.tryLock(15000)) throw new Error('Could not obtain lock (Server Busy)');
+    if (!lock.tryLock(30000)) throw new Error('Servidor ocupado (Timeout de Lock)');
 
     const payload = JSON.parse(e.postData.contents);
     const { type, data } = payload;
     
-    if (!type || !Array.isArray(data)) throw new Error('Invalid payload format');
+    if (!type) throw new Error('Tipo não especificado');
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheetName = CONFIG.SHEETS[type];
-    if (!sheetName) throw new Error('Unknown data type: ' + type);
+    if (!sheetName) throw new Error('Tabela desconhecida: ' + type);
 
-    let sheet = ss.getSheetByName(sheetName);
-    if (!sheet) {
-      sheet = ss.insertSheet(sheetName);
-    }
+    let sheet = ss.getSheetByName(sheetName) || ss.insertSheet(sheetName);
 
     const headers = CONFIG.MAPPING[type];
+    
+    // Limpa a planilha e reinseri o cabeçalho
     sheet.clear();
     sheet.appendRow(headers);
 
-    if (data.length > 0) {
-      // Filter out invalid items before saving
-      const validData = data.filter(item => {
-        if (type === 'PLAYERS') return item.id && item.name;
-        return true;
-      });
-
-      if (validData.length > 0) {
-        const rows = validData.map(item => {
-          return headers.map(header => {
-            let val = item[header];
-            if (typeof val === 'object' && val !== null) {
-              return JSON.stringify(val);
-            }
-            return val === undefined ? "" : val;
-          });
+    // Se houver dados, insere as linhas
+    if (data && data.length > 0) {
+      const rows = data.map(item => {
+        return headers.map(header => {
+          let val = item[header];
+          if (typeof val === 'object' && val !== null) {
+            return JSON.stringify(val);
+          }
+          return val === undefined ? "" : val;
         });
-        sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
-      }
+      });
+      sheet.getRange(2, 1, rows.length, headers.length).setValues(rows);
     }
 
     SpreadsheetApp.flush();

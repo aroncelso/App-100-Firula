@@ -33,14 +33,8 @@ const App: React.FC = () => {
   const [isError, setIsError] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Prevention flags
+  // Controle de carga inicial para evitar overwrite imediato
   const dataLoaded = useRef(false);
-  const skipNextSync = useRef<{ [key: string]: boolean }>({
-    PLAYERS: true,
-    MATCHES: true,
-    PAYMENTS: true,
-    EXPENSES: true
-  });
 
   // Initial Data Fetch
   useEffect(() => {
@@ -48,45 +42,43 @@ const App: React.FC = () => {
       setIsLoading(true);
       const data = await api.fetchAllData();
       if (data) {
-        // Filter out empty rows that might come from the spreadsheet
-        const cleanPlayers = (data.PLAYERS || []).filter((p: any) => p.id && p.name);
-        
-        setPlayers(cleanPlayers);
+        setPlayers((data.PLAYERS || []).filter((p: any) => p.id && p.name));
         setMatches(data.MATCHES || []);
         setPayments(data.PAYMENTS || []);
         setExpenses(data.EXPENSES || []);
         
-        // Mark as loaded and prevent immediate sync back
-        dataLoaded.current = true;
-        setIsError(false);
+        // Timeout pequeno para garantir que o estado local foi populado antes de permitir o sync
+        setTimeout(() => {
+          dataLoaded.current = true;
+          setIsError(false);
+          setIsLoading(false);
+        }, 500);
       } else {
         setIsError(true);
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
     init();
   }, []);
 
-  // Sync Logic
+  // Sync Logic centralizada
   const sync = async (type: string, data: any[]) => {
     if (!dataLoaded.current) return;
-    
-    // If this is the first change after load, skip it to avoid "echo" sync
-    if (skipNextSync.current[type]) {
-      skipNextSync.current[type] = false;
-      return;
-    }
 
     setIsSyncing(true);
-    await api.syncData(type as any, data);
-    // Tiny delay to show the "Saving" indicator to user
-    setTimeout(() => setIsSyncing(false), 1000);
+    const success = await api.syncData(type as any, data);
+    
+    // Pequeno delay visual para o usuário ver o "Salvando"
+    setTimeout(() => {
+      setIsSyncing(false);
+    }, 1500);
   };
 
-  useEffect(() => { sync('PLAYERS', players); }, [players]);
-  useEffect(() => { sync('MATCHES', matches); }, [matches]);
-  useEffect(() => { sync('PAYMENTS', payments); }, [payments]);
-  useEffect(() => { sync('EXPENSES', expenses); }, [expenses]);
+  // Efeitos de sincronização - Disparam quando as listas mudam
+  useEffect(() => { if(dataLoaded.current) sync('PLAYERS', players); }, [players]);
+  useEffect(() => { if(dataLoaded.current) sync('MATCHES', matches); }, [matches]);
+  useEffect(() => { if(dataLoaded.current) sync('PAYMENTS', payments); }, [payments]);
+  useEffect(() => { if(dataLoaded.current) sync('EXPENSES', expenses); }, [expenses]);
 
   const addPlayer = (newPlayer: Player) => {
     setPlayers(prev => [...prev, newPlayer]);
@@ -117,7 +109,7 @@ const App: React.FC = () => {
         <img src="https://i.postimg.cc/tR3cPQZd/100-firula-II-removebg-preview.png" className="w-24 h-24 animate-bounce" />
         <div className="flex items-center gap-3 text-[#F4BE02]">
           <Loader2 className="animate-spin" size={20} />
-          <span className="font-display font-bold text-sm uppercase tracking-widest">Sincronizando Elenco...</span>
+          <span className="font-display font-bold text-sm uppercase tracking-widest">Sincronizando Banco de Dados...</span>
         </div>
       </div>
     );
@@ -128,7 +120,7 @@ const App: React.FC = () => {
       <div className="min-h-screen bg-black flex flex-col items-center justify-center p-8 text-center">
         <WifiOff size={48} className="text-red-500 mb-4" />
         <h2 className="text-2xl font-display font-bold mb-2">Erro de Conexão</h2>
-        <p className="text-white/40 text-sm mb-8">Não foi possível carregar os dados. Verifique sua planilha e o script.</p>
+        <p className="text-white/40 text-sm mb-8">Certifique-se que o script está publicado e a planilha está acessível.</p>
         <button onClick={() => window.location.reload()} className="bg-[#F4BE02] text-black px-8 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center gap-2">
           <RefreshCw size={18} /> Tentar Novamente
         </button>
@@ -150,7 +142,7 @@ const App: React.FC = () => {
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all ${isSyncing ? 'bg-yellow-500/10 border-yellow-500/20' : 'bg-green-500/10 border-green-500/20'}`}>
             <CloudLightning size={12} className={isSyncing ? 'text-yellow-500 animate-pulse' : 'text-green-500'} />
             <span className={`text-[9px] font-black uppercase ${isSyncing ? 'text-yellow-500' : 'text-green-500'}`}>
-              {isSyncing ? 'Salvando...' : 'Cloud OK'}
+              {isSyncing ? 'Enviando...' : 'Planilha OK'}
             </span>
           </div>
         </div>
