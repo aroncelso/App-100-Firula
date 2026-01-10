@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
+
+import React, { useMemo, useState } from 'react';
 import { Player, Match, HalfStats } from '../types';
-import { Trophy, Target, TrendingUp, Calendar, ChevronRight, Shield, Flag, AlertTriangle, UserMinus, Flame, Footprints, Square, ShieldAlert } from 'lucide-react';
+import { Trophy, Target, TrendingUp, ChevronRight, Shield, Flame, Footprints, Square, ShieldAlert, Filter } from 'lucide-react';
 
 interface Props {
   players: Player[];
@@ -10,7 +11,33 @@ interface Props {
 const countGoals = (half: HalfStats) => half.events.filter(e => e.type === 'GOL').length;
 
 const Dashboard: React.FC<Props> = ({ players, matches }) => {
-  const lastMatch = matches[matches.length - 1];
+  const currentYear = new Date().getFullYear().toString();
+  
+  // --- FILTER STATES ---
+  const [selectedYears, setSelectedYears] = useState<string[]>([currentYear]);
+  const [selectedQuadros, setSelectedQuadros] = useState<string[]>(['Quadro 1', 'Quadro 2']);
+
+  // Extract available years from matches
+  const availableYears = useMemo(() => {
+    const years = new Set<string>();
+    matches.forEach(m => {
+      if (m.date) years.add(m.date.split('-')[0]);
+    });
+    years.add(currentYear);
+    return Array.from(years).sort().reverse();
+  }, [matches, currentYear]);
+
+  // --- FILTERING LOGIC ---
+  const filteredMatches = useMemo(() => {
+    return matches.filter(m => {
+      const matchYear = m.date ? m.date.split('-')[0] : '';
+      const yearMatch = selectedYears.length === 0 || selectedYears.includes(matchYear);
+      const quadroMatch = selectedQuadros.length === 0 || selectedQuadros.includes(m.label);
+      return yearMatch && quadroMatch;
+    });
+  }, [matches, selectedYears, selectedQuadros]);
+
+  const lastMatch = filteredMatches[filteredMatches.length - 1];
 
   // --- 1. TEAM STATS CALCULATION ---
   const teamStats = useMemo(() => {
@@ -26,15 +53,12 @@ const Dashboard: React.FC<Props> = ({ players, matches }) => {
       totalRed: 0
     };
 
-    matches.forEach(m => {
-      // Goals
+    filteredMatches.forEach(m => {
       const goalsUs = countGoals(m.stats.tempo1) + countGoals(m.stats.tempo2);
       const goalsThem = (m.stats.tempo1.opponentGoals || 0) + (m.stats.tempo2.opponentGoals || 0);
       
       stats.goalsPro += goalsUs;
       stats.goalsConceded += goalsThem;
-
-      // Discipline
       stats.totalFouls += (m.stats.tempo1.fouls || 0) + (m.stats.tempo2.fouls || 0);
       
       const countEvents = (type: string) => 
@@ -44,7 +68,6 @@ const Dashboard: React.FC<Props> = ({ players, matches }) => {
       stats.totalYellow += countEvents('AMARELO');
       stats.totalRed += countEvents('VERMELHO');
 
-      // Result
       if (m.wo === 'win') {
         stats.wins++;
         stats.wo++;
@@ -59,11 +82,10 @@ const Dashboard: React.FC<Props> = ({ players, matches }) => {
     });
 
     return stats;
-  }, [matches]);
+  }, [filteredMatches]);
 
   // --- 2. PLAYER STATS CALCULATION ---
   const playerStats = useMemo(() => {
-    // Helper to initialize map
     const map = new Map<string, { 
       id: string; 
       name: string; 
@@ -75,35 +97,22 @@ const Dashboard: React.FC<Props> = ({ players, matches }) => {
       red: number 
     }>();
 
-    // Init players
     players.forEach(p => {
-      map.set(p.id, { 
-        id: p.id, 
-        name: p.name, 
-        goals: 0, 
-        assists: 0, 
-        matches: 0, 
-        fouls: 0, 
-        yellow: 0, 
-        red: 0 
-      });
+      map.set(p.id, { id: p.id, name: p.name, goals: 0, assists: 0, matches: 0, fouls: 0, yellow: 0, red: 0 });
     });
 
-    // Iterate matches
-    matches.forEach(m => {
-       // Check participation (Roster OR Events OR Ratings)
+    filteredMatches.forEach(m => {
        players.forEach(p => {
           const inRoster = m.roster?.includes(p.id);
           const hasEvent = [...m.stats.tempo1.events, ...m.stats.tempo2.events].some(e => e.playerId === p.id);
           const hasRating = m.playerRatings && m.playerRatings[p.id] !== undefined;
 
           if (inRoster || hasEvent || hasRating) {
-             const curr = map.get(p.id)!;
-             curr.matches++;
+             const curr = map.get(p.id);
+             if (curr) curr.matches++;
           }
        });
 
-       // Count Events
        const allEvents = [...m.stats.tempo1.events, ...m.stats.tempo2.events];
        allEvents.forEach(e => {
           const curr = map.get(e.playerId);
@@ -118,7 +127,7 @@ const Dashboard: React.FC<Props> = ({ players, matches }) => {
     });
 
     return Array.from(map.values());
-  }, [matches, players]);
+  }, [filteredMatches, players]);
 
   // Leaders
   const topScorer = [...playerStats].sort((a, b) => b.goals - a.goals)[0];
@@ -136,8 +145,60 @@ const Dashboard: React.FC<Props> = ({ players, matches }) => {
 
   const lastScore = lastMatch ? getLastMatchScore(lastMatch) : { home: 0, away: 0 };
 
+  const toggleFilter = (list: string[], item: string, setter: (val: string[]) => void) => {
+    if (list.includes(item)) {
+      if (list.length > 1) setter(list.filter(i => i !== item));
+    } else {
+      setter([...list, item]);
+    }
+  };
+
   return (
-    <div className="space-y-8 pb-10">
+    <div className="space-y-6 pb-10">
+      {/* --- FILTERS SECTION --- */}
+      <section className="bg-[#0A0A0A] p-4 rounded-3xl border border-white/5 space-y-4">
+        <div className="flex items-center gap-2 mb-1 px-1">
+          <Filter size={14} className="text-[#F4BE02]" />
+          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Filtros de Visão</h3>
+        </div>
+        
+        <div className="space-y-3">
+          {/* Years Filter */}
+          <div className="flex flex-wrap gap-2">
+            {availableYears.map(year => (
+              <button
+                key={year}
+                onClick={() => toggleFilter(selectedYears, year, setSelectedYears)}
+                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${
+                  selectedYears.includes(year) 
+                  ? 'bg-[#F4BE02] text-black border-[#F4BE02] shadow-[0_4px_12px_rgba(244,190,2,0.2)]' 
+                  : 'bg-white/5 text-white/40 border-white/5'
+                }`}
+              >
+                {year}
+              </button>
+            ))}
+          </div>
+
+          {/* Quadros Filter */}
+          <div className="flex gap-2">
+            {['Quadro 1', 'Quadro 2'].map(q => (
+              <button
+                key={q}
+                onClick={() => toggleFilter(selectedQuadros, q, setSelectedQuadros)}
+                className={`flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${
+                  selectedQuadros.includes(q) 
+                  ? 'bg-white text-black border-white shadow-[0_4px_12px_rgba(255,255,255,0.1)]' 
+                  : 'bg-white/5 text-white/40 border-white/5'
+                }`}
+              >
+                {q}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* --- HERO SECTION --- */}
       <div className="relative group overflow-hidden rounded-[32px] p-8 bg-gradient-to-br from-[#0A0A0A] to-[#1A1A1A] border border-white/[0.08] shadow-2xl">
         <div className="absolute -top-10 -right-10 w-40 h-40 bg-[#F4BE02]/5 rounded-full blur-[40px]"></div>
@@ -145,11 +206,10 @@ const Dashboard: React.FC<Props> = ({ players, matches }) => {
         <div className="relative z-10">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-1.5 h-1.5 rounded-full bg-[#F4BE02] animate-pulse"></div>
-            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#F4BE02]/80">Temporada 2024</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[#F4BE02]/80">Resumo Filtrado</span>
           </div>
-          <h2 className="text-3xl font-display font-bold tracking-tight mb-6">Resumo do <br/> <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F4BE02] to-[#FFD700]">Desempenho</span></h2>
+          <h2 className="text-3xl font-display font-bold tracking-tight mb-6">Painel de <br/> <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#F4BE02] to-[#FFD700]">Estatísticas</span></h2>
           
-          {/* Main Stats Grid */}
           <div className="grid grid-cols-3 gap-2 mb-4">
               <div className="bg-green-500/10 border border-green-500/20 p-3 rounded-2xl flex flex-col items-center">
                   <span className="text-2xl font-display font-bold text-green-500">{teamStats.wins}</span>
@@ -186,14 +246,13 @@ const Dashboard: React.FC<Props> = ({ players, matches }) => {
       {lastMatch && (
         <section>
           <div className="flex items-center justify-between mb-4 px-1">
-            <h3 className="text-xs font-black uppercase tracking-widest text-white/40">Última Súmula</h3>
-            <button className="text-[10px] font-bold text-[#F4BE02] flex items-center gap-1 uppercase">Ver Todas <ChevronRight size={12}/></button>
+            <h3 className="text-xs font-black uppercase tracking-widest text-white/40">Última Súmula do Filtro</h3>
           </div>
           
           <div className="bg-[#0A0A0A] rounded-[24px] border border-white/[0.06] p-6 relative overflow-hidden">
              <div className="absolute top-4 left-0 right-0 flex justify-center">
                  <div className="bg-white/5 border border-white/10 px-3 py-1 rounded-full backdrop-blur-md">
-                     <span className="text-[9px] font-black text-white/60 uppercase tracking-widest">{lastMatch.label}</span>
+                     <span className="text-[9px] font-black text-white/60 uppercase tracking-widest">{lastMatch.label} - {lastMatch.date?.split('-')[0]}</span>
                  </div>
              </div>
 
@@ -231,7 +290,7 @@ const Dashboard: React.FC<Props> = ({ players, matches }) => {
       <section>
           <div className="flex items-center gap-2 mb-4 px-1">
              <Shield size={14} className="text-[#F4BE02]"/>
-             <h3 className="text-xs font-black uppercase tracking-widest text-white/40">Disciplina do Time</h3>
+             <h3 className="text-xs font-black uppercase tracking-widest text-white/40">Disciplina do Filtro</h3>
           </div>
           <div className="grid grid-cols-3 gap-4">
              <div className="bg-[#0A0A0A] p-4 rounded-[20px] border border-white/[0.06] flex flex-col items-center gap-2">
@@ -256,7 +315,7 @@ const Dashboard: React.FC<Props> = ({ players, matches }) => {
       <section>
           <div className="flex items-center gap-2 mb-4 px-1">
              <Flame size={14} className="text-[#F4BE02]"/>
-             <h3 className="text-xs font-black uppercase tracking-widest text-white/40">Destaques Individuais</h3>
+             <h3 className="text-xs font-black uppercase tracking-widest text-white/40">Destaques do Filtro</h3>
           </div>
           
           <div className="grid grid-cols-2 gap-3">

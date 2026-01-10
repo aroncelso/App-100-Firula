@@ -8,6 +8,8 @@ export interface Player {
   matchesPlayed: number;
   yellowCards: number;
   redCards: number;
+  whatsapp?: string;
+  active?: boolean;
 }
 
 export type EventType = 
@@ -40,19 +42,18 @@ export interface QuadroStats {
   tempo2: HalfStats;
 }
 
-// Updated Match interface: Represents ONE game (Quadro 1 OR Quadro 2)
 export interface Match {
   id: string;
   date: string;
   opponent: string;
-  label: 'Quadro 1' | 'Quadro 2'; // Identifies which team played
-  stats: QuadroStats; // Contains stats for this specific game
+  label: 'Quadro 1' | 'Quadro 2';
+  stats: QuadroStats;
   notes: string;
-  coach?: string; // New: Coach name
-  isFriendly?: boolean; // New: If true, points = 0
-  wo?: 'none' | 'win' | 'loss'; // New: Walkover status
-  playerRatings?: Record<string, number>; // New: playerId -> score (1-10)
-  roster?: string[]; // New: List of Player IDs present in this match
+  coach?: string;
+  isFriendly?: boolean;
+  wo?: 'none' | 'win' | 'loss';
+  playerRatings?: Record<string, number>;
+  roster?: string[];
 }
 
 export interface Payment {
@@ -67,7 +68,16 @@ export interface Expense {
   description: string;
   value: number;
   date: string;
+  category: 'Fixa' | 'Variável' | string;
+}
+
+export interface ScoringRule {
+  id: string;
+  label: string;
+  value: number;
+  active: boolean;
+  type: 'positive' | 'negative' | 'coach';
   category?: string;
 }
 
-export type ScreenType = 'DASHBOARD' | 'SUMULAS' | 'JOGADORES' | 'FINANCEIRO' | 'CADASTRO_JOGADOR' | 'CARTOLA';
+export type ScreenType = 'DASHBOARD' | 'SUMULAS' | 'JOGADORES' | 'FINANCEIRO' | 'CADASTRO_JOGADOR' | 'CARTOLA' | 'EDITAR_JOGADOR';

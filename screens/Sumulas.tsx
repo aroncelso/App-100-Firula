@@ -376,24 +376,24 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
           </div>
 
           <div className="overflow-x-auto bg-[#0A0A0A] pb-32">
-            <div className="min-w-[950px]">
-              <div className="grid grid-cols-[130px_repeat(10,minmax(70px,1fr))] gap-2 px-3 py-4 sticky top-0 bg-[#0A0A0A] z-30 border-b border-white/5">
+            <div className="min-w-[1050px]">
+              <div className="grid grid-cols-[130px_repeat(10,minmax(85px,1fr))] gap-2 px-3 py-4 sticky top-0 bg-[#0A0A0A] z-30 border-b border-white/5">
                 <div className="text-[8px] font-black text-white/20 uppercase tracking-widest pl-1">Atleta</div>
                 <div className="text-[8px] font-black text-green-500 text-center uppercase tracking-widest">Gols</div>
-                <div className="text-[8px] font-black text-[#F4BE02] text-center uppercase tracking-widest">Assis</div>
-                <div className="text-[8px] font-black text-red-500 text-center uppercase tracking-widest">Falta</div>
-                <div className="text-[8px] font-black text-yellow-500 text-center uppercase tracking-widest">CA</div>
-                <div className="text-[8px] font-black text-red-800 text-center uppercase tracking-widest">CV</div>
-                <div className="text-[8px] font-black text-blue-400 text-center uppercase tracking-widest">DP</div>
-                <div className="text-[8px] font-black text-orange-500 text-center uppercase tracking-widest">GC</div>
-                <div className="text-[8px] font-black text-purple-500 text-center uppercase tracking-widest">PP</div>
-                <div className="text-[8px] font-black text-cyan-400 text-center uppercase tracking-widest">PS</div>
-                <div className="text-[8px] font-black text-pink-500 text-center uppercase tracking-widest">PC</div>
+                <div className="text-[8px] font-black text-[#F4BE02] text-center uppercase tracking-widest">Assistências</div>
+                <div className="text-[8px] font-black text-red-500 text-center uppercase tracking-widest">Faltas</div>
+                <div className="text-[8px] font-black text-yellow-500 text-center uppercase tracking-widest">C. Amarelo</div>
+                <div className="text-[8px] font-black text-red-800 text-center uppercase tracking-widest">C. Vermelho</div>
+                <div className="text-[8px] font-black text-blue-400 text-center uppercase tracking-widest">Def. Pênalti</div>
+                <div className="text-[8px] font-black text-orange-500 text-center uppercase tracking-widest">Gol Contra</div>
+                <div className="text-[8px] font-black text-purple-500 text-center uppercase tracking-widest">Pên. Perdido</div>
+                <div className="text-[8px] font-black text-cyan-400 text-center uppercase tracking-widest">Pên. Sofrido</div>
+                <div className="text-[8px] font-black text-pink-500 text-center uppercase tracking-widest">Pên. Cometido</div>
               </div>
 
               <div className="p-3 space-y-1.5">
                  {sortedPlayers.filter(p => getActiveRoster().includes(p.id)).map(player => (
-                    <div key={player.id} className="grid grid-cols-[130px_repeat(10,minmax(70px,1fr))] gap-2 items-center bg-white/[0.02] border border-white/[0.05] p-2 rounded-xl">
+                    <div key={player.id} className="grid grid-cols-[130px_repeat(10,minmax(85px,1fr))] gap-2 items-center bg-white/[0.02] border border-white/[0.05] p-2 rounded-xl">
                       <div className="truncate pr-1">
                         <p className="text-xs font-bold text-white leading-none truncate">{player.name}</p>
                         <p className="text-[8px] text-white/30 uppercase mt-1 font-bold">{player.position}</p>

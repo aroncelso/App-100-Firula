@@ -6,14 +6,14 @@ import {
   DollarSign, 
   FileText, 
   LayoutDashboard,
-  Bell,
   CloudLightning,
   Loader2,
   WifiOff,
   RefreshCw,
-  Crown
+  Crown,
+  CheckCircle2
 } from 'lucide-react';
-import { ScreenType, Player, Match, Payment, Expense } from './types';
+import { ScreenType, Player, Match, Payment, Expense, ScoringRule } from './types';
 import Dashboard from './screens/Dashboard';
 import Sumulas from './screens/Sumulas';
 import Players from './screens/Players';
@@ -22,36 +22,62 @@ import PlayerForm from './screens/PlayerForm';
 import Cartola from './screens/Cartola';
 import { api } from './services/sheetApi';
 
+const DEFAULT_RULES: ScoringRule[] = [
+  { id: 'GOAL_GK', label: 'Gol de Goleiro', value: 10, active: true, type: 'positive', category: 'Goleiro' },
+  { id: 'GOAL_DEF', label: 'Gol de Zagueiro', value: 8, active: true, type: 'positive', category: 'Zagueiro' },
+  { id: 'GOAL_MID', label: 'Gol de Meio-Campo', value: 5, active: true, type: 'positive', category: 'Meio-Campo' },
+  { id: 'GOAL_FWD', label: 'Gol de Atacante', value: 8, active: true, type: 'positive', category: 'Atacante' },
+  { id: 'ASSIST', label: 'Assistência', value: 5, active: true, type: 'positive' },
+  { id: 'CLEAN_SHEET', label: 'SG (Clean Sheet)', value: 5, active: true, type: 'positive' },
+  { id: 'DEF_PENALTY', label: 'Defesa de Pênalti', value: 7, active: true, type: 'positive' },
+  { id: 'COACH_WIN', label: 'Técnico: Vitória', value: 6, active: true, type: 'coach' },
+  { id: 'COACH_DRAW', label: 'Técnico: Empate', value: 3, active: true, type: 'coach' },
+  { id: 'FOUL', label: 'Falta Cometida', value: -0.5, active: true, type: 'negative' },
+  { id: 'YELLOW', label: 'Cartão Amarelo', value: -2, active: true, type: 'negative' },
+  { id: 'RED', label: 'Cartão Vermelho', value: -5, active: true, type: 'negative' },
+  { id: 'MISSED_PENALTY', label: 'Pênalti Perdido', value: -4, active: true, type: 'negative' },
+  { id: 'OWN_GOAL', label: 'Gol Contra', value: -5, active: true, type: 'negative' },
+  { id: 'GOAL_CONCEDED', label: 'Gol Sofrido (GK)', value: -1, active: true, type: 'negative' },
+];
+
 const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<ScreenType>('DASHBOARD');
   const [players, setPlayers] = useState<Player[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [scoringRules, setScoringRules] = useState<ScoringRule[]>([]);
+  const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
 
-  // Controle de carga inicial para evitar overwrite imediato
   const dataLoaded = useRef(false);
 
-  // Initial Data Fetch
+  // Busca inicial de todos os dados do banco
   useEffect(() => {
     const init = async () => {
       setIsLoading(true);
       const data = await api.fetchAllData();
       if (data) {
-        setPlayers((data.PLAYERS || []).filter((p: any) => p.id && p.name));
-        setMatches(data.MATCHES || []);
-        setPayments(data.PAYMENTS || []);
-        setExpenses(data.EXPENSES || []);
+        setPlayers(data.PLAYERS);
+        setMatches(data.MATCHES);
+        setPayments(data.PAYMENTS);
+        setExpenses(data.EXPENSES);
         
-        // Timeout pequeno para garantir que o estado local foi populado antes de permitir o sync
+        if (data.RULES && data.RULES.length > 0) {
+          setScoringRules(data.RULES);
+        } else {
+          setScoringRules(DEFAULT_RULES);
+        }
+        
         setTimeout(() => {
           dataLoaded.current = true;
           setIsError(false);
           setIsLoading(false);
+          setLastSyncTime(new Date());
         }, 500);
       } else {
         setIsError(true);
@@ -61,33 +87,45 @@ const App: React.FC = () => {
     init();
   }, []);
 
-  // Sync Logic centralizada
-  const sync = async (type: string, data: any[]) => {
+  // Motor de Sincronização Automática (Debounce de 2 segundos)
+  useEffect(() => {
     if (!dataLoaded.current) return;
 
-    setIsSyncing(true);
-    const success = await api.syncData(type as any, data);
-    
-    // Pequeno delay visual para o usuário ver o "Salvando"
-    setTimeout(() => {
-      setIsSyncing(false);
-    }, 1500);
-  };
+    const timer = setTimeout(async () => {
+      setIsSyncing(true);
+      const success = await api.syncAllData({
+        PLAYERS: players,
+        MATCHES: matches,
+        EXPENSES: expenses,
+        PAYMENTS: payments,
+        RULES: scoringRules
+      });
+      
+      if (success) {
+        setLastSyncTime(new Date());
+      }
+      setTimeout(() => setIsSyncing(false), 800);
+    }, 2000);
 
-  // Efeitos de sincronização - Disparam quando as listas mudam
-  useEffect(() => { if(dataLoaded.current) sync('PLAYERS', players); }, [players]);
-  useEffect(() => { if(dataLoaded.current) sync('MATCHES', matches); }, [matches]);
-  useEffect(() => { if(dataLoaded.current) sync('PAYMENTS', payments); }, [payments]);
-  useEffect(() => { if(dataLoaded.current) sync('EXPENSES', expenses); }, [expenses]);
+    return () => clearTimeout(timer);
+  }, [players, matches, expenses, payments, scoringRules]);
 
-  const addPlayer = (newPlayer: Player) => {
-    setPlayers(prev => [...prev, newPlayer]);
-    setPayments(prev => [...prev, {
-      playerId: newPlayer.id,
-      month: new Date().toLocaleString('pt-BR', { month: 'long' }),
-      status: 'Pendente',
-      value: 50.00
-    }]);
+  const savePlayer = (playerData: Player) => {
+    if (editingPlayer) {
+      setPlayers(prev => prev.map(p => p.id === playerData.id ? playerData : p));
+    } else {
+      setPlayers(prev => [...prev, playerData]);
+      // Gera pagamento pendente inicial para o mês atual ao cadastrar novo jogador
+      const currentMonth = new Date().toLocaleString('pt-BR', { month: 'long' });
+      const currentYear = new Date().getFullYear();
+      setPayments(prev => [...prev, {
+        playerId: playerData.id,
+        month: `${currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1)} / ${currentYear}`,
+        status: 'Pendente',
+        value: 50.00
+      }]);
+    }
+    setEditingPlayer(null);
     setCurrentScreen('JOGADORES');
   };
 
@@ -95,10 +133,11 @@ const App: React.FC = () => {
     switch (currentScreen) {
       case 'DASHBOARD': return <Dashboard players={players} matches={matches} />;
       case 'SUMULAS': return <Sumulas matches={matches} players={players} setMatches={setMatches} />;
-      case 'JOGADORES': return <Players players={players} matches={matches} onAddPlayer={() => setCurrentScreen('CADASTRO_JOGADOR')} />;
+      case 'JOGADORES': return <Players players={players} matches={matches} onAddPlayer={() => { setEditingPlayer(null); setCurrentScreen('CADASTRO_JOGADOR'); }} onEditPlayer={(p) => { setEditingPlayer(p); setCurrentScreen('EDITAR_JOGADOR'); }} />;
       case 'FINANCEIRO': return <Finance payments={payments} players={players} setPayments={setPayments} expenses={expenses} setExpenses={setExpenses} />;
-      case 'CADASTRO_JOGADOR': return <PlayerForm onSave={addPlayer} onCancel={() => setCurrentScreen('JOGADORES')} />;
-      case 'CARTOLA': return <Cartola players={players} matches={matches} />;
+      case 'CADASTRO_JOGADOR': return <PlayerForm onSave={savePlayer} onCancel={() => setCurrentScreen('JOGADORES')} />;
+      case 'EDITAR_JOGADOR': return <PlayerForm playerToEdit={editingPlayer || undefined} onSave={savePlayer} onCancel={() => { setEditingPlayer(null); setCurrentScreen('JOGADORES'); }} />;
+      case 'CARTOLA': return <Cartola players={players} matches={matches} rules={scoringRules} setRules={setScoringRules} />;
       default: return <Dashboard players={players} matches={matches} />;
     }
   };
@@ -107,9 +146,12 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center gap-6">
         <img src="https://i.postimg.cc/tR3cPQZd/100-firula-II-removebg-preview.png" className="w-24 h-24 animate-bounce" />
-        <div className="flex items-center gap-3 text-[#F4BE02]">
-          <Loader2 className="animate-spin" size={20} />
-          <span className="font-display font-bold text-sm uppercase tracking-widest">Sincronizando Banco de Dados...</span>
+        <div className="flex flex-col items-center gap-2">
+            <div className="flex items-center gap-3 text-[#F4BE02]">
+                <Loader2 className="animate-spin" size={20} />
+                <span className="font-display font-bold text-sm uppercase tracking-widest">Acessando Planilha Cloud...</span>
+            </div>
+            <p className="text-white/20 text-[9px] uppercase tracking-widest font-black">Carregando Banco de Dados Integrado</p>
         </div>
       </div>
     );
@@ -119,10 +161,10 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center p-8 text-center">
         <WifiOff size={48} className="text-red-500 mb-4" />
-        <h2 className="text-2xl font-display font-bold mb-2">Erro de Conexão</h2>
-        <p className="text-white/40 text-sm mb-8">Certifique-se que o script está publicado e a planilha está acessível.</p>
-        <button onClick={() => window.location.reload()} className="bg-[#F4BE02] text-black px-8 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center gap-2">
-          <RefreshCw size={18} /> Tentar Novamente
+        <h2 className="text-2xl font-display font-bold mb-2">Erro na Rede</h2>
+        <p className="text-white/40 text-sm mb-8">Não foi possível conectar ao servidor do Google Sheets.</p>
+        <button onClick={() => window.location.reload()} className="bg-[#F4BE02] text-black px-8 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-yellow-500/20">
+          <RefreshCw size={18} /> Reconectar
         </button>
       </div>
     );
@@ -135,15 +177,22 @@ const App: React.FC = () => {
           <img src="https://i.postimg.cc/tR3cPQZd/100-firula-II-removebg-preview.png" alt="Logo" className="w-10 h-10" />
           <div>
             <h1 className="text-lg font-display font-bold leading-none">100<span className="text-[#F4BE02]">FIRULA</span></h1>
-            <p className="text-[9px] uppercase tracking-widest font-bold text-white/30">Management App</p>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-white/30">Management Mobile</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all ${isSyncing ? 'bg-yellow-500/10 border-yellow-500/20' : 'bg-green-500/10 border-green-500/20'}`}>
-            <CloudLightning size={12} className={isSyncing ? 'text-yellow-500 animate-pulse' : 'text-green-500'} />
-            <span className={`text-[9px] font-black uppercase ${isSyncing ? 'text-yellow-500' : 'text-green-500'}`}>
-              {isSyncing ? 'Enviando...' : 'Planilha OK'}
-            </span>
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-500 ${isSyncing ? 'bg-yellow-500/10 border-yellow-500/20' : 'bg-green-500/10 border-green-500/20'}`}>
+            {isSyncing ? <Loader2 size={12} className="text-yellow-500 animate-spin" /> : <CheckCircle2 size={12} className="text-green-500" />}
+            <div className="flex flex-col">
+                <span className={`text-[8px] font-black uppercase ${isSyncing ? 'text-yellow-500' : 'text-green-500'}`}>
+                {isSyncing ? 'Sincronizando...' : 'Nuvem OK'}
+                </span>
+                {!isSyncing && lastSyncTime && (
+                    <span className="text-[6px] text-white/30 uppercase font-bold tracking-tighter">
+                        Hoje às {lastSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                )}
+            </div>
           </div>
         </div>
       </header>
@@ -153,8 +202,8 @@ const App: React.FC = () => {
       <nav className="fixed bottom-6 left-5 right-5 z-50 bg-[#151515] rounded-[28px] border border-white/10 p-2 flex justify-between shadow-2xl backdrop-blur-xl">
         <NavBtn active={currentScreen === 'DASHBOARD'} onClick={() => setCurrentScreen('DASHBOARD')} icon={<LayoutDashboard size={20} />} label="Início" />
         <NavBtn active={currentScreen === 'SUMULAS'} onClick={() => setCurrentScreen('SUMULAS')} icon={<FileText size={20} />} label="Súmulas" />
-        <NavBtn active={currentScreen === 'CARTOLA'} onClick={() => setCurrentScreen('CARTOLA')} icon={<Crown size={20} />} label="Ranking" />
-        <NavBtn active={currentScreen === 'JOGADORES' || currentScreen === 'CADASTRO_JOGADOR'} onClick={() => setCurrentScreen('JOGADORES')} icon={<Users size={20} />} label="Elenco" />
+        <NavBtn active={currentScreen === 'CARTOLA'} onClick={() => setCurrentScreen('CARTOLA')} icon={<Crown size={20} />} label="Cartola" />
+        <NavBtn active={currentScreen === 'JOGADORES' || currentScreen === 'CADASTRO_JOGADOR' || currentScreen === 'EDITAR_JOGADOR'} onClick={() => setCurrentScreen('JOGADORES')} icon={<Users size={20} />} label="Elenco" />
         <NavBtn active={currentScreen === 'FINANCEIRO'} onClick={() => setCurrentScreen('FINANCEIRO')} icon={<DollarSign size={20} />} label="Caixa" />
       </nav>
     </div>
@@ -162,7 +211,7 @@ const App: React.FC = () => {
 };
 
 const NavBtn = ({ active, onClick, icon, label }: any) => (
-  <button onClick={onClick} className={`flex flex-col items-center justify-center flex-1 py-3 rounded-2xl transition-all ${active ? 'text-[#F4BE02] bg-white/5' : 'text-white/30'}`}>
+  <button onClick={onClick} className={`flex flex-col items-center justify-center flex-1 py-3 rounded-2xl transition-all duration-300 ${active ? 'text-[#F4BE02] bg-white/5' : 'text-white/30'}`}>
     {icon}
     <span className="text-[8px] font-black uppercase mt-1 tracking-widest">{label}</span>
   </button>
