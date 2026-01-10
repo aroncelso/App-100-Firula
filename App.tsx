@@ -56,9 +56,21 @@ const App: React.FC = () => {
 
   const dataLoaded = useRef(false);
 
-  // Busca inicial de todos os dados do banco
+  // Função para forçar atualização total
+  const handleForceRefresh = () => {
+    sessionStorage.setItem('auto_refreshed', 'true');
+    window.location.reload();
+  };
+
+  // Busca inicial e lógica de Auto-Refresh na inicialização
   useEffect(() => {
     const init = async () => {
+      // Lógica de atualização automática para limpar cache na primeira vez que abre na sessão
+      if (!sessionStorage.getItem('auto_refreshed')) {
+        handleForceRefresh();
+        return;
+      }
+
       setIsLoading(true);
       const data = await api.fetchAllData();
       if (data) {
@@ -87,7 +99,7 @@ const App: React.FC = () => {
     init();
   }, []);
 
-  // Motor de Sincronização Automática (Debounce de 2 segundos)
+  // Motor de Sincronização Automática
   useEffect(() => {
     if (!dataLoaded.current) return;
 
@@ -115,7 +127,6 @@ const App: React.FC = () => {
       setPlayers(prev => prev.map(p => p.id === playerData.id ? playerData : p));
     } else {
       setPlayers(prev => [...prev, playerData]);
-      // Gera pagamento pendente inicial para o mês atual ao cadastrar novo jogador
       const currentMonth = new Date().toLocaleString('pt-BR', { month: 'long' });
       const currentYear = new Date().getFullYear();
       setPayments(prev => [...prev, {
@@ -149,9 +160,9 @@ const App: React.FC = () => {
         <div className="flex flex-col items-center gap-2">
             <div className="flex items-center gap-3 text-[#F4BE02]">
                 <Loader2 className="animate-spin" size={20} />
-                <span className="font-display font-bold text-sm uppercase tracking-widest">Acessando Planilha Cloud...</span>
+                <span className="font-display font-bold text-sm uppercase tracking-widest">Sincronizando Nuvem...</span>
             </div>
-            <p className="text-white/20 text-[9px] uppercase tracking-widest font-black">Carregando Banco de Dados Integrado</p>
+            <p className="text-white/20 text-[9px] uppercase tracking-widest font-black">Limpando cache e carregando dados</p>
         </div>
       </div>
     );
@@ -161,10 +172,10 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center p-8 text-center">
         <WifiOff size={48} className="text-red-500 mb-4" />
-        <h2 className="text-2xl font-display font-bold mb-2">Erro na Rede</h2>
-        <p className="text-white/40 text-sm mb-8">Não foi possível conectar ao servidor do Google Sheets.</p>
-        <button onClick={() => window.location.reload()} className="bg-[#F4BE02] text-black px-8 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-yellow-500/20">
-          <RefreshCw size={18} /> Reconectar
+        <h2 className="text-2xl font-display font-bold mb-2">Erro de Conexão</h2>
+        <p className="text-white/40 text-sm mb-8">Não foi possível carregar as informações.</p>
+        <button onClick={handleForceRefresh} className="bg-[#F4BE02] text-black px-8 py-4 rounded-2xl font-black uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-yellow-500/20">
+          <RefreshCw size={18} /> Tentar Novamente
         </button>
       </div>
     );
@@ -177,19 +188,28 @@ const App: React.FC = () => {
           <img src="https://i.postimg.cc/tR3cPQZd/100-firula-II-removebg-preview.png" alt="Logo" className="w-10 h-10" />
           <div>
             <h1 className="text-lg font-display font-bold leading-none">100<span className="text-[#F4BE02]">FIRULA</span></h1>
-            <p className="text-[9px] uppercase tracking-widest font-bold text-white/30">Management Mobile</p>
+            <p className="text-[9px] uppercase tracking-widest font-bold text-white/30">Management App</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          {/* Botão de Refresh Manual */}
+          <button 
+            onClick={handleForceRefresh}
+            className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-[#F4BE02] hover:bg-[#F4BE02]/10 transition-all active:scale-90"
+            title="Atualizar App e Cache"
+          >
+            <RefreshCw size={18} className={isSyncing ? 'animate-spin' : ''} />
+          </button>
+
           <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all duration-500 ${isSyncing ? 'bg-yellow-500/10 border-yellow-500/20' : 'bg-green-500/10 border-green-500/20'}`}>
             {isSyncing ? <Loader2 size={12} className="text-yellow-500 animate-spin" /> : <CheckCircle2 size={12} className="text-green-500" />}
             <div className="flex flex-col">
                 <span className={`text-[8px] font-black uppercase ${isSyncing ? 'text-yellow-500' : 'text-green-500'}`}>
-                {isSyncing ? 'Sincronizando...' : 'Nuvem OK'}
+                {isSyncing ? 'Sincronizando...' : 'Conectado'}
                 </span>
                 {!isSyncing && lastSyncTime && (
                     <span className="text-[6px] text-white/30 uppercase font-bold tracking-tighter">
-                        Hoje às {lastSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        v. {lastSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                 )}
             </div>
