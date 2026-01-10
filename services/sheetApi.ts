@@ -6,18 +6,8 @@ const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzJqAJJAERSdD
 export const api = {
   async fetchAllData() {
     try {
-      // Usando sinalizador de tempo para evitar caches agressivos do navegador
-      const response = await fetch(`${GOOGLE_SCRIPT_URL}?nocache=${Date.now()}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
+      const response = await fetch(`${GOOGLE_SCRIPT_URL}?nocache=${Date.now()}`);
+      if (!response.ok) throw new Error('Network response was not ok');
       const data = await response.json();
       
       if (data && typeof data === 'object' && data.PLAYERS) {
@@ -25,15 +15,14 @@ export const api = {
       }
       return null;
     } catch (error) {
-      console.error("Error fetching data from Google Sheets:", error);
-      // Retorna null para disparar o estado de erro no App.tsx
+      console.error("Error fetching data:", error);
       return null;
     }
   },
 
   async syncData(type: 'PLAYERS' | 'MATCHES' | 'EXPENSES' | 'PAYMENTS', data: any[]) {
     try {
-      // POST para Google Apps Script com redirecionamento exige modo no-cors em muitos ambientes locais
+      // Sincroniza sempre, mesmo vazio, para garantir que o cabeçalho seja criado na planilha
       await fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors', 

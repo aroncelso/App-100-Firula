@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Match, Player, EventType, MatchEvent, QuadroStats, HalfStats } from '../types';
-import { Plus, X, Calendar, Eraser, Save, Minus, CheckCircle2, Pencil, Handshake, Flag, Trophy, Star, Crown, Users, Check, UserCog, MoreHorizontal, AlertOctagon, Footprints, Hand, Ban, User, Zap, Square, ShieldAlert } from 'lucide-react';
+import { Plus, X, Calendar, Eraser, Save, Minus, CheckCircle2, Pencil, Handshake, Flag, Trophy, Star, Crown, Users, Check, UserCog, AlertOctagon, Footprints, Hand, Ban, Zap, Square, ShieldAlert } from 'lucide-react';
 
 interface Props {
   matches: Match[];
@@ -345,93 +345,80 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
       )}
 
       {showForm ? (
-        <div className="bg-[#0A0A0A] rounded-[32px] border border-white/[0.1] shadow-2xl flex flex-col h-[calc(100vh-140px)] animate-in fade-in slide-in-from-bottom-6 duration-300 relative overflow-hidden">
-          <div className="bg-[#111] p-3 border-b border-white/5 flex flex-col gap-2 z-20">
+        <div className="bg-[#0A0A0A] rounded-[32px] border border-white/[0.1] shadow-2xl flex flex-col animate-in fade-in slide-in-from-bottom-6 duration-300 relative">
+          <div className="bg-[#111] p-4 border-b border-white/5 flex flex-col gap-3 z-20 sticky top-0">
              <div className="flex justify-between items-center">
-                 <button onClick={() => setShowForm(false)} className="w-7 h-7 flex items-center justify-center rounded-full bg-white/5 text-white/40"><X size={14}/></button>
-                 <div className="flex items-center gap-2"><Calendar size={10} className="text-[#F4BE02]" /><input type="date" className="bg-transparent text-[9px] font-black text-white/60 uppercase tracking-widest outline-none text-right" value={formMatch.date} onChange={e => setFormMatch({...formMatch, date: e.target.value})} /></div>
-                 <button onClick={() => setIsRemoveMode(!isRemoveMode)} className={`w-7 h-7 rounded-full flex items-center justify-center transition-all ${isRemoveMode ? 'bg-red-500 text-white animate-pulse' : 'bg-white/5 text-white/40'}`}><Eraser size={12} /></button>
+                 <button onClick={() => setShowForm(false)} className="w-8 h-8 flex items-center justify-center rounded-full bg-white/5 text-white/40"><X size={16}/></button>
+                 <div className="flex items-center gap-2"><Calendar size={12} className="text-[#F4BE02]" /><input type="date" className="bg-transparent text-[10px] font-black text-white/60 uppercase tracking-widest outline-none text-right" value={formMatch.date} onChange={e => setFormMatch({...formMatch, date: e.target.value})} /></div>
+                 <button onClick={() => setIsRemoveMode(!isRemoveMode)} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${isRemoveMode ? 'bg-red-500 text-white animate-pulse' : 'bg-white/5 text-white/40'}`}><Eraser size={14} /></button>
              </div>
-             <div className="flex justify-center w-full"><input className="bg-transparent text-center font-display font-bold text-lg text-white placeholder:text-white/20 outline-none w-full" placeholder="NOME DO ADVERSÁRIO" value={formMatch.opponent} onChange={e => setFormMatch({...formMatch, opponent: e.target.value})} /></div>
-             <div className="flex flex-wrap justify-center gap-2">
-                <button onClick={() => setShowRosterModal(true)} className="flex items-center gap-1 px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-wider border border-white/10 bg-white/5 text-white/60"><Users size={10} /> Escalação ({getActiveRoster().length})</button>
-                <button onClick={() => setFormMatch(prev => ({...prev, isFriendly: !prev.isFriendly}))} className={`flex items-center gap-1 px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-wider border transition-all ${formMatch.isFriendly ? 'bg-blue-500/20 text-blue-500 border-blue-500/30' : 'bg-white/5 text-white/30 border-white/5'}`}><Handshake size={10} /> {formMatch.isFriendly ? 'Amistoso' : 'Pontuado'}</button>
-                <button onClick={cycleWO} className={`flex items-center gap-1 px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-wider border transition-all ${formMatch.wo === 'win' ? 'bg-green-500/20 text-green-500 border-green-500/30' : formMatch.wo === 'loss' ? 'bg-red-500/20 text-red-500 border-red-500/30' : 'bg-white/5 text-white/30 border-white/5'}`}><Flag size={10} /> {formMatch.wo === 'none' ? 'Sem W.O.' : formMatch.wo === 'win' ? 'W.O. (V)' : 'W.O. (D)'}</button>
+             <div className="flex justify-center w-full"><input className="bg-transparent text-center font-display font-bold text-xl text-white placeholder:text-white/20 outline-none w-full" placeholder="NOME DO ADVERSÁRIO" value={formMatch.opponent} onChange={e => setFormMatch({...formMatch, opponent: e.target.value})} /></div>
+             <div className="flex flex-wrap justify-center gap-2 pt-1">
+                <button onClick={() => setShowRosterModal(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider border border-white/10 bg-white/5 text-white/60"><Users size={12} /> Escalação ({getActiveRoster().length})</button>
+                <button onClick={() => setFormMatch(prev => ({...prev, isFriendly: !prev.isFriendly}))} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider border transition-all ${formMatch.isFriendly ? 'bg-blue-500/20 text-blue-500 border-blue-500/30' : 'bg-white/5 text-white/30 border-white/5'}`}><Handshake size={12} /> {formMatch.isFriendly ? 'Amistoso' : 'Pontuado'}</button>
+                <button onClick={cycleWO} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-wider border transition-all ${formMatch.wo === 'win' ? 'bg-green-500/20 text-green-500 border-green-500/30' : formMatch.wo === 'loss' ? 'bg-red-500/20 text-red-500 border-red-500/30' : 'bg-white/5 text-white/30 border-white/5'}`}><Flag size={12} /> {formMatch.wo === 'none' ? 'Sem W.O.' : formMatch.wo === 'win' ? 'W.O. (Vitória)' : 'W.O. (Derrota)'}</button>
              </div>
           </div>
-
-          <div className="flex-1 flex flex-col relative bg-[#0A0A0A] overflow-hidden">
-            {/* Quadro Toggle and Main Score */}
-            <div className="bg-[#111]">
-              <div className="grid grid-cols-2 p-1 gap-1">
+          
+          <div className="bg-[#111]">
+              <div className="grid grid-cols-2 p-2 gap-2">
                   {(['quadro2', 'quadro1'] as QuadroType[]).map(q => {
                       const isDisabled = formMatch.id && formMatch.editingLabel && ((formMatch.editingLabel === 'Quadro 1' && q !== 'quadro1') || (formMatch.editingLabel === 'Quadro 2' && q !== 'quadro2'));
-                      return (<button key={q} disabled={!!isDisabled} onClick={() => setActiveQuadro(q)} className={`py-2 rounded-lg text-[9px] font-black uppercase tracking-[0.1em] transition-all border flex items-center justify-center gap-1 ${activeQuadro === q ? 'bg-[#F4BE02] text-black border-[#F4BE02]' : 'bg-white/[0.03] text-white/30 border-white/[0.05]'} ${isDisabled ? 'opacity-20' : ''}`}>{q === 'quadro2' ? 'Quadro 2' : 'Quadro 1'}</button>);
+                      return (<button key={q} disabled={!!isDisabled} onClick={() => setActiveQuadro(q)} className={`py-3 rounded-xl text-xs font-black uppercase tracking-[0.2em] transition-all border flex items-center justify-center gap-2 ${activeQuadro === q ? 'bg-[#F4BE02] text-black border-[#F4BE02]' : 'bg-white/[0.03] text-white/30 border-white/[0.05]'} ${isDisabled ? 'opacity-20' : ''}`}>{q === 'quadro2' ? 'Quadro 2' : 'Quadro 1'}</button>);
                   })}
               </div>
-              <div className="py-1 px-4 flex items-center justify-between">
-                <div className="flex flex-col items-center w-1/3"><span className="text-[7px] font-black text-white/30 uppercase tracking-widest">100 FIRULA</span><span className="text-2xl font-display font-bold text-[#F4BE02]">{ourGoalsTotal}</span></div>
-                <div className="text-white/10 font-black text-sm">X</div>
-                <div className="flex flex-col items-center w-1/3"><span className="text-[7px] font-black text-white/30 uppercase tracking-widest">ADVERSÁRIO</span><div className="flex items-center gap-2"><button onClick={() => handleOpponentStat('opponentGoals', -1)} className="text-white/20 p-1"><Minus size={10}/></button><span className="text-2xl font-display font-bold text-white">{opponentGoalsTotal}</span><button onClick={() => handleOpponentStat('opponentGoals', 1)} className="text-[#F4BE02]/50 p-1"><Plus size={10}/></button></div></div>
+          </div>
+
+          <div className="bg-[#0A0A0A] border-b border-white/5 shadow-2xl pb-4">
+              <div className="py-4 px-6 flex items-center justify-between"><div className="flex flex-col items-center w-1/3"><span className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-1">100 FIRULA</span><span className="text-5xl font-display font-bold text-[#F4BE02] leading-none">{ourGoalsTotal}</span></div><div className="text-white/10 font-black text-2xl">X</div><div className="flex flex-col items-center w-1/3 group relative"><span className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-1">ADVERSÁRIO</span><div className="flex items-center gap-3"><button onClick={() => handleOpponentStat('opponentGoals', -1)} className="text-white/20 hover:text-white p-1"><Minus size={14}/></button><span className="text-5xl font-display font-bold text-white leading-none">{opponentGoalsTotal}</span><button onClick={() => handleOpponentStat('opponentGoals', 1)} className="text-[#F4BE02]/50 hover:text-[#F4BE02] p-1"><Plus size={14}/></button></div></div></div>
+              <div className="flex justify-center pb-3"><div className="bg-white/[0.05] p-1 rounded-lg flex"><button onClick={() => setCurrentTempo(1)} className={`px-6 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all ${currentTempo === 1 ? 'bg-white text-black' : 'text-white/40'}`}>1º Tempo</button><button onClick={() => setCurrentTempo(2)} className={`px-6 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all ${currentTempo === 2 ? 'bg-white text-black' : 'text-white/40'}`}>2º Tempo</button></div></div>
+              <div className="grid grid-cols-2 divide-x divide-white/10 border-t border-white/10"><div className="flex items-center justify-center p-2 gap-2"><span className={`text-xl font-bold font-display ${ourFouls >= 5 ? 'text-red-500 animate-pulse' : 'text-white'}`}>{ourFouls}</span><span className="text-[9px] font-black uppercase tracking-widest text-white/30">Faltas (Nós)</span></div><div className="flex items-center justify-center p-2 gap-2"><button onClick={() => handleOpponentStat('opponentFouls', -1)} className="w-5 h-5 flex items-center justify-center bg-white/5 rounded text-white/30"><Minus size={10}/></button><span className="text-xl font-bold font-display text-red-500">{opponentFouls}</span><button onClick={() => handleOpponentStat('opponentFouls', 1)} className="w-5 h-5 flex items-center justify-center bg-red-500/10 rounded text-red-500"><Plus size={10}/></button><span className="text-[9px] font-black uppercase tracking-widest text-white/30">Faltas (Eles)</span></div></div>
+          </div>
+
+          <div className="overflow-x-auto bg-[#0A0A0A] pb-32">
+            <div className="min-w-[950px]">
+              <div className="grid grid-cols-[130px_repeat(10,minmax(70px,1fr))] gap-2 px-3 py-4 sticky top-0 bg-[#0A0A0A] z-30 border-b border-white/5">
+                <div className="text-[8px] font-black text-white/20 uppercase tracking-widest pl-1">Atleta</div>
+                <div className="text-[8px] font-black text-green-500 text-center uppercase tracking-widest">Gols</div>
+                <div className="text-[8px] font-black text-[#F4BE02] text-center uppercase tracking-widest">Assis</div>
+                <div className="text-[8px] font-black text-red-500 text-center uppercase tracking-widest">Falta</div>
+                <div className="text-[8px] font-black text-yellow-500 text-center uppercase tracking-widest">CA</div>
+                <div className="text-[8px] font-black text-red-800 text-center uppercase tracking-widest">CV</div>
+                <div className="text-[8px] font-black text-blue-400 text-center uppercase tracking-widest">DP</div>
+                <div className="text-[8px] font-black text-orange-500 text-center uppercase tracking-widest">GC</div>
+                <div className="text-[8px] font-black text-purple-500 text-center uppercase tracking-widest">PP</div>
+                <div className="text-[8px] font-black text-cyan-400 text-center uppercase tracking-widest">PS</div>
+                <div className="text-[8px] font-black text-pink-500 text-center uppercase tracking-widest">PC</div>
               </div>
-              <div className="flex justify-center pb-1"><div className="bg-white/[0.05] p-0.5 rounded-md flex"><button onClick={() => setCurrentTempo(1)} className={`px-3 py-1 rounded-sm text-[7px] font-black uppercase transition-all ${currentTempo === 1 ? 'bg-white text-black' : 'text-white/40'}`}>1º Tempo</button><button onClick={() => setCurrentTempo(2)} className={`px-3 py-1 rounded-sm text-[7px] font-black uppercase transition-all ${currentTempo === 2 ? 'bg-white text-black' : 'text-white/40'}`}>2º Tempo</button></div></div>
-              <div className="grid grid-cols-2 divide-x divide-white/10 border-t border-white/10"><div className="flex items-center justify-center p-1 gap-1"><span className={`text-sm font-bold font-display ${ourFouls >= 5 ? 'text-red-500 animate-pulse' : 'text-white'}`}>{ourFouls}</span><span className="text-[7px] font-black uppercase text-white/30">Faltas (Nós)</span></div><div className="flex items-center justify-center p-1 gap-1"><button onClick={() => handleOpponentStat('opponentFouls', -1)} className="w-3 h-3 flex items-center justify-center bg-white/5 rounded text-white/30"><Minus size={8}/></button><span className="text-sm font-bold font-display text-red-500">{opponentFouls}</span><button onClick={() => handleOpponentStat('opponentFouls', 1)} className="w-3 h-3 flex items-center justify-center bg-red-500/10 rounded text-red-500"><Plus size={8}/></button><span className="text-[7px] font-black uppercase text-white/30">Faltas (Eles)</span></div></div>
-            </div>
 
-            {/* FIXED TABLE: No scroll horizontal, all columns visible via icons */}
-            <div className="grid grid-cols-[22%_repeat(10,1fr)] bg-[#0A0A0A] border-b border-white/5 z-40 text-center">
-              <div className="px-2 py-1.5 text-[7px] font-black text-white/20 uppercase tracking-widest text-left border-r border-white/5">Atleta</div>
-              <HeaderIcon icon={<Trophy size={9} className="text-green-500" />} />
-              <HeaderIcon icon={<Zap size={9} className="text-[#F4BE02]" />} />
-              <HeaderIcon icon={<ShieldAlert size={9} className="text-red-500" />} />
-              <HeaderIcon icon={<Square size={9} className="text-yellow-500" fill="currentColor" />} />
-              <HeaderIcon icon={<Square size={9} className="text-red-700" fill="currentColor" />} />
-              <HeaderIcon icon={<Hand size={9} className="text-blue-400" />} />
-              <HeaderIcon icon={<Footprints size={9} className="text-orange-500" />} />
-              <HeaderIcon icon={<AlertOctagon size={9} className="text-cyan-400" />} />
-              <HeaderIcon icon={<AlertOctagon size={9} className="text-pink-500" />} />
-              <HeaderIcon icon={<Ban size={9} className="text-purple-500" />} />
-            </div>
-
-            {/* List of Players (Fixed, fits on screen) */}
-            <div className="flex-1 overflow-hidden bg-[#0A0A0A]">
-               {sortedPlayers.filter(p => getActiveRoster().includes(p.id)).map(player => (
-                 <div key={player.id} className="grid grid-cols-[22%_repeat(10,1fr)] border-b border-white/[0.03]">
-                    {/* Name Column */}
-                    <div className="px-2 py-1.5 border-r border-white/5 bg-[#0A0A0A] flex flex-col justify-center overflow-hidden">
-                      <p className="text-[8px] font-bold text-white truncate leading-none">{player.name}</p>
-                      <p className="text-[6px] text-white/20 uppercase mt-0.5 font-bold truncate">{player.position.substring(0,3)}</p>
+              <div className="p-3 space-y-1.5">
+                 {sortedPlayers.filter(p => getActiveRoster().includes(p.id)).map(player => (
+                    <div key={player.id} className="grid grid-cols-[130px_repeat(10,minmax(70px,1fr))] gap-2 items-center bg-white/[0.02] border border-white/[0.05] p-2 rounded-xl">
+                      <div className="truncate pr-1">
+                        <p className="text-xs font-bold text-white leading-none truncate">{player.name}</p>
+                        <p className="text-[8px] text-white/30 uppercase mt-1 font-bold">{player.position}</p>
+                      </div>
+                      <StatButton count={getPlayerEventCount(player.id, 'GOL')} onClick={() => handlePlayerEvent(player.id, 'GOL')} colorClass="text-green-500 bg-green-500/10 border-green-500/20" isRemoveMode={isRemoveMode} />
+                      <StatButton count={getPlayerEventCount(player.id, 'ASSIST')} onClick={() => handlePlayerEvent(player.id, 'ASSIST')} icon={<Zap size={10} />} colorClass="text-[#F4BE02] bg-[#F4BE02]/10 border-[#F4BE02]/20" isRemoveMode={isRemoveMode} />
+                      <StatButton count={getPlayerEventCount(player.id, 'FALTA')} onClick={() => handlePlayerEvent(player.id, 'FALTA')} icon={<ShieldAlert size={10} />} colorClass="text-red-500 bg-red-500/10 border-red-500/20" isRemoveMode={isRemoveMode} />
+                      <StatButton count={getPlayerEventCount(player.id, 'AMARELO')} onClick={() => handlePlayerEvent(player.id, 'AMARELO')} icon={<Square size={10} fill="currentColor" />} colorClass="text-yellow-500 bg-yellow-500/10 border-yellow-500/20" isRemoveMode={isRemoveMode} />
+                      <StatButton count={getPlayerEventCount(player.id, 'VERMELHO')} onClick={() => handlePlayerEvent(player.id, 'VERMELHO')} icon={<Square size={10} fill="currentColor" />} colorClass="text-red-700 bg-red-700/10 border-red-700/20" isRemoveMode={isRemoveMode} />
+                      <StatButton count={getPlayerEventCount(player.id, 'DEFESA_PENALTI')} onClick={() => handlePlayerEvent(player.id, 'DEFESA_PENALTI')} icon={<Hand size={10} />} colorClass="text-blue-400 bg-blue-400/10 border-blue-400/20" isRemoveMode={isRemoveMode} />
+                      <StatButton count={getPlayerEventCount(player.id, 'GOL_CONTRA')} onClick={() => handlePlayerEvent(player.id, 'GOL_CONTRA')} icon={<Footprints size={10} className="rotate-180" />} colorClass="text-orange-500 bg-orange-500/10 border-orange-500/20" isRemoveMode={isRemoveMode} />
+                      <StatButton count={getPlayerEventCount(player.id, 'PENALTI_PERDIDO')} onClick={() => handlePlayerEvent(player.id, 'PENALTI_PERDIDO')} icon={<Ban size={10} />} colorClass="text-purple-500 bg-purple-500/10 border-purple-500/20" isRemoveMode={isRemoveMode} />
+                      <StatButton count={getPlayerEventCount(player.id, 'PENALTI_SOFRIDO')} onClick={() => handlePlayerEvent(player.id, 'PENALTI_SOFRIDO')} icon={<AlertOctagon size={10} />} colorClass="text-cyan-400 bg-cyan-400/10 border-cyan-400/20" isRemoveMode={isRemoveMode} />
+                      <StatButton count={getPlayerEventCount(player.id, 'PENALTI_COMETIDO')} onClick={() => handlePlayerEvent(player.id, 'PENALTI_COMETIDO')} icon={<AlertOctagon size={10} />} colorClass="text-pink-500 bg-pink-500/10 border-pink-500/20" isRemoveMode={isRemoveMode} />
                     </div>
-
-                    {/* Stats Columns */}
-                    <StatCellMini count={getPlayerEventCount(player.id, 'GOL')} onClick={() => handlePlayerEvent(player.id, 'GOL')} colorClass="text-green-500" isRemoveMode={isRemoveMode} />
-                    <StatCellMini count={getPlayerEventCount(player.id, 'ASSIST')} onClick={() => handlePlayerEvent(player.id, 'ASSIST')} colorClass="text-[#F4BE02]" isRemoveMode={isRemoveMode} />
-                    <StatCellMini count={getPlayerEventCount(player.id, 'FALTA')} onClick={() => handlePlayerEvent(player.id, 'FALTA')} colorClass="text-red-500" isRemoveMode={isRemoveMode} />
-                    <StatCellMini count={getPlayerEventCount(player.id, 'AMARELO')} onClick={() => handlePlayerEvent(player.id, 'AMARELO')} colorClass="text-yellow-500" isRemoveMode={isRemoveMode} />
-                    <StatCellMini count={getPlayerEventCount(player.id, 'VERMELHO')} onClick={() => handlePlayerEvent(player.id, 'VERMELHO')} colorClass="text-red-700" isRemoveMode={isRemoveMode} />
-                    <StatCellMini count={getPlayerEventCount(player.id, 'DEFESA_PENALTI')} onClick={() => handlePlayerEvent(player.id, 'DEFESA_PENALTI')} colorClass="text-blue-400" isRemoveMode={isRemoveMode} />
-                    <StatCellMini count={getPlayerEventCount(player.id, 'GOL_CONTRA')} onClick={() => handlePlayerEvent(player.id, 'GOL_CONTRA')} colorClass="text-orange-500" isRemoveMode={isRemoveMode} />
-                    <StatCellMini count={getPlayerEventCount(player.id, 'PENALTI_SOFRIDO')} onClick={() => handlePlayerEvent(player.id, 'PENALTI_SOFRIDO')} colorClass="text-cyan-400" isRemoveMode={isRemoveMode} />
-                    <StatCellMini count={getPlayerEventCount(player.id, 'PENALTI_COMETIDO')} onClick={() => handlePlayerEvent(player.id, 'PENALTI_COMETIDO')} colorClass="text-pink-500" isRemoveMode={isRemoveMode} />
-                    <StatCellMini count={getPlayerEventCount(player.id, 'PENALTI_PERDIDO')} onClick={() => handlePlayerEvent(player.id, 'PENALTI_PERDIDO')} colorClass="text-purple-500" isRemoveMode={isRemoveMode} />
-                 </div>
-               ))}
-               
-               {getActiveRoster().length === 0 && (
-                 <div className="flex flex-col items-center justify-center py-10 opacity-20 text-center px-4">
-                   <Users size={24} className="mb-2" />
-                   <p className="text-[8px] font-black uppercase tracking-widest">Atletas não escalados.</p>
-                 </div>
-               )}
+                 ))}
+              </div>
             </div>
-
-            {/* Save Button fixed at the bottom of the table area */}
-            <div className="p-2 border-t border-white/5 bg-[#111] flex justify-center">
-              <button onClick={handleSave} disabled={!formMatch.opponent} className={`w-full max-w-xs py-2 rounded-xl flex items-center justify-center gap-2 transition-all ${saveSuccess ? 'bg-green-500 text-white' : 'bg-[#F4BE02] text-black shadow-lg'}`}>
-                {saveSuccess ? <CheckCircle2 size={14}/> : <Save size={14} />}
-                <span className="font-black text-[10px] uppercase tracking-widest">{saveSuccess ? `SALVO` : (formMatch.id && formMatch.editingLabel === (activeQuadro === 'quadro1' ? 'Quadro 1' : 'Quadro 2') ? `ATUALIZAR` : `SALVAR QUADRO`)}</span>
-              </button>
-            </div>
+          </div>
+          
+          <div className="fixed bottom-32 left-0 right-0 z-40 flex justify-center pointer-events-none">
+            <button onClick={handleSave} disabled={!formMatch.opponent} className={`pointer-events-auto px-8 py-3 rounded-full flex items-center gap-2 shadow-[0_8px_30px_rgba(0,0,0,0.5)] border border-white/10 backdrop-blur-md transition-all ${saveSuccess ? 'bg-green-500 text-white' : 'bg-[#F4BE02] text-black'}`}>
+              {saveSuccess ? <CheckCircle2 size={18}/> : <Save size={18} />}
+              <span className="font-black text-xs uppercase tracking-widest">{saveSuccess ? `SALVO` : (formMatch.id && formMatch.editingLabel === (activeQuadro === 'quadro1' ? 'Quadro 1' : 'Quadro 2') ? `ATUALIZAR` : `SALVAR QUADRO`)}</span>
+            </button>
           </div>
         </div>
       ) : (
@@ -442,7 +429,7 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
              const q1Match = group.matches.find(m => m.label === 'Quadro 1');
              const q2Match = group.matches.find(m => m.label === 'Quadro 2');
              const renderMatchRow = (match: Match | undefined, label: string) => {
-                 if (!match) return (<div className="border border-dashed border-white/10 rounded-2xl p-4 flex items-center justify-center text-[10px] font-black uppercase tracking-widest text-white/20 h-[110px]">{label} Pendente</div>);
+                 if (!match) return (<div className="border border-dashed border-white/10 rounded-2xl p-4 flex items-center justify-center text-[10px] font-black uppercase tracking-widest text-white/20 h-[88px]">{label} Pendente</div>);
                  const score = calculateScoreAndPoints(match);
                  const mvpName = getMVP(match);
                  const coachName = match.coach;
@@ -492,23 +479,9 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
   );
 };
 
-const HeaderIcon = ({ icon }: { icon: React.ReactNode }) => (
-  <div className="flex items-center justify-center border-r border-white/5 py-1.5">{icon}</div>
-);
-
-const StatCellMini = ({ count, onClick, colorClass, isRemoveMode }: any) => (
-  <button 
-    onClick={onClick} 
-    className={`h-full flex items-center justify-center border-r border-white/5 transition-all active:scale-90
-      ${isRemoveMode ? 'bg-red-500/10' : 'bg-transparent'}`}
-  >
-    <div className={`flex flex-col items-center justify-center ${colorClass}`}>
-      {isRemoveMode ? <Minus size={8} strokeWidth={4} /> : (
-        <span className={`font-black ${count > 0 ? 'text-[9px]' : 'text-[7px] opacity-20'}`}>
-          {count > 0 ? count : '0'}
-        </span>
-      )}
-    </div>
+const StatButton = ({ count, onClick, colorClass, icon, isRemoveMode }: any) => (
+  <button onClick={onClick} className={`h-10 rounded-lg flex items-center justify-center border transition-all relative overflow-hidden flex-1 ${isRemoveMode ? "border-red-500/50 bg-red-500/5 text-red-500 opacity-80" : colorClass}`}>
+    <div className="relative z-10 flex items-center justify-center gap-1">{isRemoveMode ? (<Minus size={12} strokeWidth={4} />) : (<>{icon}<span className={`font-black ${count > 0 ? 'text-sm' : 'text-xs opacity-50'}`}>{count > 0 ? count : (icon ? '' : '+')}</span></>)}</div>
   </button>
 );
 
