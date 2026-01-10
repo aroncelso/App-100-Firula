@@ -1,24 +1,36 @@
 
 /**
- * 100 FIRULA SOCIETY - SINGLE DATABASE ENGINE v2.0
- * Gerenciamento centralizado de Súmulas, Financeiro e Atletas.
+ * 100 FIRULA SOCIETY - DATABASE ENGINE v6.0
+ * Organização automática em abas sem nenhuma formatação.
  */
 
-const SHEET_NAME = 'Banco de Dados 100 Firula';
+const CONFIG = {
+  'JOGADORES': ['ID', 'NOME', 'POSICAO', 'GOLS', 'ASSISTENCIAS', 'JOGOS', 'AMARELOS', 'VERMELHOS', 'WHATSAPP', 'ATIVO'],
+  'SÚMULAS': ['ID', 'DATA', 'ADVERSARIO', 'QUADRO', 'TECNICO', 'AMISTOSO', 'WO', 'NOTAS', 'ESTATISTICAS_JSON', 'ELENCO_JSON', 'AVALIACOES_JSON'],
+  'DESPESAS': ['ID', 'DATA', 'DESCRICAO', 'VALOR', 'CATEGORIA'],
+  'MENSALIDADES': ['PLAYER_ID', 'MES', 'STATUS', 'VALOR'],
+  'REGRAS_CARTOLA': ['ID', 'LABEL', 'CATEGORIA', 'VALOR', 'ATIVO', 'TIPO']
+};
 
-// Cabeçalhos que mapeiam todas as funcionalidades do App
-const HEADERS_MAP = [
-  'TIPO', 'IDENTIFICADOR', 'NOME_OU_ADVERSARIO', 'POSICAO_OU_QUADRO', 'GOLS_OU_VALOR', 
-  'ASSISTENCIAS_OU_MES', 'PARTIDAS_OU_STATUS', 'CATEGORIA_DESPESA_OU_REGRA', 'VERMELHOS', 
-  'DATA_OU_WHATSAPP', 'TECNICO_OU_ATIVO', 'AMISTOSO', 'WO', 'NOTAS', 'ESTATISTICAS_JSON', 
-  'ELENCO_JSON', 'AVALIACOES_JSON'
-];
+/**
+ * Cria ou recupera uma aba sem nenhuma cor ou estilo.
+ */
+function getOrCreateSheet(name) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(name);
+  const headers = CONFIG[name];
+  
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+    if (headers && headers.length > 0) {
+      sheet.appendRow(headers);
+      sheet.setFrozenRows(1);
+    }
+  }
+  return sheet;
+}
 
 function doGet() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
-  const data = sheet.getDataRange().getValues();
-  
   const result = {
     PLAYERS: [],
     MATCHES: [],
@@ -27,67 +39,66 @@ function doGet() {
     RULES: []
   };
 
-  if (data.length <= 1) return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
-
-  const rows = data.slice(1);
   const parseJSON = (val) => {
     try { return val ? JSON.parse(val) : null; } catch (e) { return null; }
   };
 
-  rows.forEach(row => {
-    const tipo = row[0];
-    if (tipo === 'JOGADOR') {
-      result.PLAYERS.push({ 
-        id: row[1], 
-        name: row[2], 
-        position: row[3], 
-        goals: row[4] || 0, 
-        assists: row[5] || 0, 
-        matchesPlayed: row[6] || 0, 
-        yellowCards: row[7] || 0, 
-        redCards: row[8] || 0,
-        whatsapp: row[9] || "",
-        active: row[10] !== 'Não'
-      });
-    } else if (tipo === 'PARTIDA') {
-      result.MATCHES.push({ 
-        id: row[1], 
-        opponent: row[2], 
-        label: row[3], 
-        date: row[9] instanceof Date ? row[9].toISOString().split('T')[0] : row[9], 
-        coach: row[10], 
-        isFriendly: row[11], 
-        wo: row[12], 
-        notes: row[13], 
-        stats: parseJSON(row[14]) || { tempo1: {fouls:0, opponentGoals:0, opponentFouls:0, events:[]}, tempo2: {fouls:0, opponentGoals:0, opponentFouls:0, events:[]} }, 
-        roster: parseJSON(row[15]) || [], 
-        playerRatings: parseJSON(row[16]) || {} 
-      });
-    } else if (tipo === 'DESPESA') {
-      result.EXPENSES.push({ 
-        id: row[1], 
-        description: row[2], 
-        value: row[4], 
-        category: row[7], // Fixa / Variável
-        date: row[9] instanceof Date ? row[9].toISOString().split('T')[0] : row[9] 
-      });
-    } else if (tipo === 'MENSALIDADE') {
-      result.PAYMENTS.push({ 
-        playerId: row[1], 
-        value: row[4],
-        month: row[5], 
-        status: row[6] 
-      });
-    } else if (tipo === 'REGRA') {
-      result.RULES.push({ 
-        id: row[1], 
-        label: row[2], 
-        category: row[3],
-        value: parseFloat(row[4]), 
-        active: row[6] === 'Sim', 
-        type: row[7] 
-      });
-    }
+  // 1. JOGADORES
+  const sheetPlayers = getOrCreateSheet('JOGADORES');
+  const dataPlayers = sheetPlayers.getDataRange().getValues().slice(1);
+  dataPlayers.forEach(row => {
+    if (!row[0]) return;
+    result.PLAYERS.push({
+      id: row[0].toString(), name: row[1], position: row[2], goals: Number(row[3]) || 0, assists: Number(row[4]) || 0,
+      matchesPlayed: Number(row[5]) || 0, yellowCards: Number(row[6]) || 0, redCards: Number(row[7]) || 0, whatsapp: row[8],
+      active: row[9] !== 'Não'
+    });
+  });
+
+  // 2. SÚMULAS
+  const sheetMatches = getOrCreateSheet('SÚMULAS');
+  const dataMatches = sheetMatches.getDataRange().getValues().slice(1);
+  dataMatches.forEach(row => {
+    if (!row[0]) return;
+    result.MATCHES.push({
+      id: row[0].toString(), 
+      date: row[1] instanceof Date ? row[1].toISOString().split('T')[0] : row[1],
+      opponent: row[2], label: row[3], coach: row[4], isFriendly: row[5] === true,
+      wo: row[6], notes: row[7], stats: parseJSON(row[8]), roster: parseJSON(row[9]),
+      playerRatings: parseJSON(row[10])
+    });
+  });
+
+  // 3. DESPESAS
+  const sheetExpenses = getOrCreateSheet('DESPESAS');
+  const dataExpenses = sheetExpenses.getDataRange().getValues().slice(1);
+  dataExpenses.forEach(row => {
+    if (!row[0]) return;
+    result.EXPENSES.push({
+      id: row[0].toString(), date: row[1] instanceof Date ? row[1].toISOString().split('T')[0] : row[1],
+      description: row[2], value: Number(row[3]) || 0, category: row[4]
+    });
+  });
+
+  // 4. MENSALIDADES
+  const sheetPayments = getOrCreateSheet('MENSALIDADES');
+  const dataPayments = sheetPayments.getDataRange().getValues().slice(1);
+  dataPayments.forEach(row => {
+    if (!row[0]) return;
+    result.PAYMENTS.push({
+      playerId: row[0].toString(), month: row[1], status: row[2], value: Number(row[3]) || 0
+    });
+  });
+
+  // 5. REGRAS
+  const sheetRules = getOrCreateSheet('REGRAS_CARTOLA');
+  const dataRules = sheetRules.getDataRange().getValues().slice(1);
+  dataRules.forEach(row => {
+    if (!row[0]) return;
+    result.RULES.push({
+      id: row[0].toString(), label: row[1], category: row[2], value: Number(row[3]) || 0,
+      active: row[4] === 'Sim', type: row[5]
+    });
   });
 
   return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
@@ -96,72 +107,80 @@ function doGet() {
 function doPost(e) {
   const lock = LockService.getScriptLock();
   try {
-    if (!lock.tryLock(30000)) throw new Error('Servidor ocupado. Tente novamente em instantes.');
+    if (!lock.tryLock(30000)) throw new Error('Servidor ocupado.');
     
     const payload = JSON.parse(e.postData.contents);
     const allData = payload.data;
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName(SHEET_NAME) || ss.insertSheet(SHEET_NAME);
     
-    sheet.clear();
-    sheet.appendRow(HEADERS_MAP);
-    
-    const rows = [];
+    if (!allData) throw new Error('Dados ausentes.');
 
-    // Mapeamento de JOGADORES
-    if (allData.PLAYERS) {
-      allData.PLAYERS.forEach(p => {
-        const r = Array(HEADERS_MAP.length).fill(""); 
-        r[0]='JOGADOR'; r[1]=p.id; r[2]=p.name; r[3]=p.position; r[4]=p.goals; r[5]=p.assists; 
-        r[6]=p.matchesPlayed; r[7]=p.yellowCards; r[8]=p.redCards; r[9]=p.whatsapp || "";
-        r[10]=p.active === false ? 'Não' : 'Sim';
-        rows.push(r);
-      });
+    // Atualização JOGADORES
+    const sheetP = getOrCreateSheet('JOGADORES');
+    const headersP = CONFIG['JOGADORES'];
+    if (sheetP.getLastRow() > 1) {
+      sheetP.getRange(2, 1, sheetP.getLastRow() - 1, headersP.length).clearContent();
     }
-    
-    // Mapeamento de PARTIDAS
-    if (allData.MATCHES) {
-      allData.MATCHES.forEach(m => {
-        const r = Array(HEADERS_MAP.length).fill(""); 
-        r[0]='PARTIDA'; r[1]=m.id; r[2]=m.opponent; r[3]=m.label; r[9]=m.date; r[10]=m.coach; 
-        r[11]=m.isFriendly; r[12]=m.wo; r[13]=m.notes; r[14]=JSON.stringify(m.stats); 
-        r[15]=JSON.stringify(m.roster); r[16]=JSON.stringify(m.playerRatings);
-        rows.push(r);
-      });
-    }
-    
-    // Mapeamento de DESPESAS (Consulta e Lançamento)
-    if (allData.EXPENSES) {
-      allData.EXPENSES.forEach(ex => {
-        const r = Array(HEADERS_MAP.length).fill(""); 
-        r[0]='DESPESA'; r[1]=ex.id; r[2]=ex.description; r[4]=ex.value; r[7]=ex.category; r[9]=ex.date; 
-        rows.push(r);
-      });
-    }
-    
-    // Mapeamento de MENSALIDADES (Receitas)
-    if (allData.PAYMENTS) {
-      allData.PAYMENTS.forEach(pay => {
-        const r = Array(HEADERS_MAP.length).fill(""); 
-        r[0]='MENSALIDADE'; r[1]=pay.playerId; r[4]=pay.value; r[5]=pay.month; r[6]=pay.status; 
-        rows.push(r);
-      });
-    }
-    
-    // Mapeamento de REGRAS (Cartola)
-    if (allData.RULES) {
-      allData.RULES.forEach(rule => {
-        const r = Array(HEADERS_MAP.length).fill(""); 
-        r[0]='REGRA'; r[1]=rule.id; r[2]=rule.label; r[3]=rule.category || ""; r[4]=rule.value; 
-        r[6]=rule.active ? 'Sim' : 'Não'; r[7]=rule.type; 
-        rows.push(r);
-      });
+    if (allData.PLAYERS && allData.PLAYERS.length > 0) {
+      const rowsP = allData.PLAYERS.map(p => [
+        p.id, p.name, p.position, p.goals, p.assists, p.matchesPlayed, 
+        p.yellowCards, p.redCards, p.whatsapp, p.active === false ? 'Não' : 'Sim'
+      ]);
+      sheetP.getRange(2, 1, rowsP.length, headersP.length).setValues(rowsP);
     }
 
-    if (rows.length > 0) {
-      sheet.getRange(2, 1, rows.length, HEADERS_MAP.length).setValues(rows);
+    // Atualização SÚMULAS
+    const sheetM = getOrCreateSheet('SÚMULAS');
+    const headersM = CONFIG['SÚMULAS'];
+    if (sheetM.getLastRow() > 1) {
+      sheetM.getRange(2, 1, sheetM.getLastRow() - 1, headersM.length).clearContent();
     }
-    
+    if (allData.MATCHES && allData.MATCHES.length > 0) {
+      const rowsM = allData.MATCHES.map(m => [
+        m.id, m.date, m.opponent, m.label, m.coach, m.isFriendly, m.wo, m.notes,
+        JSON.stringify(m.stats), JSON.stringify(m.roster), JSON.stringify(m.playerRatings)
+      ]);
+      sheetM.getRange(2, 1, rowsM.length, headersM.length).setValues(rowsM);
+    }
+
+    // Atualização DESPESAS
+    const sheetE = getOrCreateSheet('DESPESAS');
+    const headersE = CONFIG['DESPESAS'];
+    if (sheetE.getLastRow() > 1) {
+      sheetE.getRange(2, 1, sheetE.getLastRow() - 1, headersE.length).clearContent();
+    }
+    if (allData.EXPENSES && allData.EXPENSES.length > 0) {
+      const rowsE = allData.EXPENSES.map(ex => [
+        ex.id, ex.date, ex.description, ex.value, ex.category
+      ]);
+      sheetE.getRange(2, 1, rowsE.length, headersE.length).setValues(rowsE);
+    }
+
+    // Atualização MENSALIDADES
+    const sheetPay = getOrCreateSheet('MENSALIDADES');
+    const headersPay = CONFIG['MENSALIDADES'];
+    if (sheetPay.getLastRow() > 1) {
+      sheetPay.getRange(2, 1, sheetPay.getLastRow() - 1, headersPay.length).clearContent();
+    }
+    if (allData.PAYMENTS && allData.PAYMENTS.length > 0) {
+      const rowsPay = allData.PAYMENTS.map(py => [
+        py.playerId, py.month, py.status, py.value
+      ]);
+      sheetPay.getRange(2, 1, rowsPay.length, headersPay.length).setValues(rowsPay);
+    }
+
+    // Atualização REGRAS
+    const sheetR = getOrCreateSheet('REGRAS_CARTOLA');
+    const headersR = CONFIG['REGRAS_CARTOLA'];
+    if (sheetR.getLastRow() > 1) {
+      sheetR.getRange(2, 1, sheetR.getLastRow() - 1, headersR.length).clearContent();
+    }
+    if (allData.RULES && allData.RULES.length > 0) {
+      const rowsR = allData.RULES.map(r => [
+        r.id, r.label, r.category, r.value, r.active ? 'Sim' : 'Não', r.type
+      ]);
+      sheetR.getRange(2, 1, rowsR.length, headersR.length).setValues(rowsR);
+    }
+
     SpreadsheetApp.flush();
     return ContentService.createTextOutput(JSON.stringify({ status: 'success' })).setMimeType(ContentService.MimeType.JSON);
     

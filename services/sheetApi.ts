@@ -1,12 +1,11 @@
 
 import { Player, Match, Expense, Payment, ScoringRule } from '../types';
 
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwIYLQZ4wZLfBTvlYNhvE_n5UUyA4gGncc1pa-b6VOewMFHvVDyIkSuMGcMq2detix0PA/exec';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwe7A4htBxfdoEobOVTsP4uG43OOjwhBszfCefc_zWa_VF3A1InlX45ylpmxZqT5nCN/exec';
 
 export const api = {
   /**
-   * Busca todos os dados da planilha unificada.
-   * Usa nocache para garantir que os dados de "consulta" sejam os mais atuais.
+   * Busca todos os dados das abas organizadas (JOGADORES, SÚMULAS, DESPESAS, etc).
    */
   async fetchAllData() {
     try {
@@ -16,11 +15,11 @@ export const api = {
       
       if (data && typeof data === 'object') {
         return {
-          PLAYERS: data.PLAYERS || [],
-          MATCHES: data.MATCHES || [],
-          EXPENSES: data.EXPENSES || [],
-          PAYMENTS: data.PAYMENTS || [],
-          RULES: data.RULES || []
+          PLAYERS: Array.isArray(data.PLAYERS) ? data.PLAYERS : [],
+          MATCHES: Array.isArray(data.MATCHES) ? data.MATCHES : [],
+          EXPENSES: Array.isArray(data.EXPENSES) ? data.EXPENSES : [],
+          PAYMENTS: Array.isArray(data.PAYMENTS) ? data.PAYMENTS : [],
+          RULES: Array.isArray(data.RULES) ? data.RULES : []
         };
       }
       return null;
@@ -31,7 +30,7 @@ export const api = {
   },
 
   /**
-   * Sincroniza o estado local completo do app com a planilha.
+   * Sincroniza o estado local completo, distribuindo os dados para as abas corretas via POST.
    */
   async syncAllData(allData: { 
     PLAYERS: Player[], 
@@ -41,17 +40,17 @@ export const api = {
     RULES: ScoringRule[] 
   }) {
     try {
-      // Usamos POST com mode: no-cors para evitar problemas de redirecionamento do Google Script
-      await fetch(GOOGLE_SCRIPT_URL, {
+      const response = await fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors', 
         headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ type: 'ALL_DATA', data: allData }),
+        body: JSON.stringify({ type: 'SYNC_ALL_CHANNELS', data: allData }),
       });
-      console.log("✅ Sincronização em nuvem concluída com sucesso.");
+      // Com no-cors, não conseguimos ler o corpo da resposta, mas o fetch resolve se enviado.
+      console.log("✅ Sincronização multi-abas enviada com sucesso.");
       return true;
     } catch (error) {
-      console.error(`❌ Erro na sincronização global:`, error);
+      console.error(`❌ Erro na sincronização:`, error);
       return false;
     }
   }
