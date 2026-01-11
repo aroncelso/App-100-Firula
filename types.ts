@@ -61,6 +61,7 @@ export interface Payment {
   month: string;
   status: 'Pago' | 'Pendente';
   value: number;
+  paymentDate?: string; // Novo campo para data do pagamento
 }
 
 export interface Expense {

@@ -22,6 +22,8 @@ import PlayerForm from './screens/PlayerForm';
 import Cartola from './screens/Cartola';
 import { api } from './services/sheetApi';
 
+const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+
 const DEFAULT_RULES: ScoringRule[] = [
   { id: 'GOAL_GK', label: 'Gol de Goleiro', value: 10, active: true, type: 'positive', category: 'Goleiro' },
   { id: 'GOAL_DEF', label: 'Gol de Zagueiro', value: 8, active: true, type: 'positive', category: 'Zagueiro' },
@@ -50,48 +52,47 @@ const App: React.FC = () => {
   const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
   
   const [isLoading, setIsLoading] = useState(true);
+  const [isReadyToSync, setIsReadyToSync] = useState(false);
   const [isError, setIsError] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null);
 
-  const dataLoaded = useRef(false);
-
-  // Função para forçar atualização total
   const handleForceRefresh = () => {
     sessionStorage.setItem('auto_refreshed', 'true');
     window.location.reload();
   };
 
-  // Busca inicial e lógica de Auto-Refresh na inicialização
   useEffect(() => {
     const init = async () => {
-      // Lógica de atualização automática para limpar cache na primeira vez que abre na sessão
       if (!sessionStorage.getItem('auto_refreshed')) {
         handleForceRefresh();
         return;
       }
 
       setIsLoading(true);
-      const data = await api.fetchAllData();
-      if (data) {
-        setPlayers(data.PLAYERS);
-        setMatches(data.MATCHES);
-        setPayments(data.PAYMENTS);
-        setExpenses(data.EXPENSES);
-        
-        if (data.RULES && data.RULES.length > 0) {
-          setScoringRules(data.RULES);
-        } else {
-          setScoringRules(DEFAULT_RULES);
-        }
-        
-        setTimeout(() => {
-          dataLoaded.current = true;
+      try {
+        const data = await api.fetchAllData();
+        if (data) {
+          setPlayers(data.PLAYERS);
+          setMatches(data.MATCHES);
+          setPayments(data.PAYMENTS);
+          setExpenses(data.EXPENSES);
+          
+          if (data.RULES && data.RULES.length > 0) {
+            setScoringRules(data.RULES);
+          } else {
+            setScoringRules(DEFAULT_RULES);
+          }
+          
           setIsError(false);
           setIsLoading(false);
           setLastSyncTime(new Date());
-        }, 500);
-      } else {
+          setTimeout(() => setIsReadyToSync(true), 1500);
+        } else {
+          setIsError(true);
+          setIsLoading(false);
+        }
+      } catch (err) {
         setIsError(true);
         setIsLoading(false);
       }
@@ -99,9 +100,8 @@ const App: React.FC = () => {
     init();
   }, []);
 
-  // Motor de Sincronização Automática (Debounced para evitar spam, mas ágil o suficiente)
   useEffect(() => {
-    if (!dataLoaded.current) return;
+    if (!isReadyToSync || isLoading) return;
 
     const timer = setTimeout(async () => {
       setIsSyncing(true);
@@ -117,23 +117,25 @@ const App: React.FC = () => {
         setLastSyncTime(new Date());
       }
       setTimeout(() => setIsSyncing(false), 800);
-    }, 1000); // Reduzido para 1 segundo para maior percepção de "tempo real"
+    }, 1200);
 
     return () => clearTimeout(timer);
-  }, [players, matches, expenses, payments, scoringRules]);
+  }, [players, matches, expenses, payments, scoringRules, isReadyToSync, isLoading]);
 
   const savePlayer = (playerData: Player) => {
     if (editingPlayer) {
       setPlayers(prev => prev.map(p => p.id === playerData.id ? playerData : p));
     } else {
       setPlayers(prev => [...prev, playerData]);
-      const currentMonth = new Date().toLocaleString('pt-BR', { month: 'long' });
-      const currentYear = new Date().getFullYear();
+      const now = new Date();
+      const currentMonthName = MONTHS[now.getMonth()];
+      const currentYear = now.getFullYear();
+      
       setPayments(prev => [...prev, {
         playerId: playerData.id,
-        month: `${currentMonth.charAt(0).toUpperCase() + currentMonth.slice(1)} / ${currentYear}`,
+        month: `${currentMonthName} / ${currentYear}`,
         status: 'Pendente',
-        value: 50.00
+        value: 0 // Removido padrão de 50.00
       }]);
     }
     setEditingPlayer(null);
@@ -160,9 +162,9 @@ const App: React.FC = () => {
         <div className="flex flex-col items-center gap-2">
             <div className="flex items-center gap-3 text-[#F4BE02]">
                 <Loader2 className="animate-spin" size={20} />
-                <span className="font-display font-bold text-sm uppercase tracking-widest">Sincronizando Nuvem...</span>
+                <span className="font-display font-bold text-sm uppercase tracking-widest">Iniciando Sistema...</span>
             </div>
-            <p className="text-white/20 text-[9px] uppercase tracking-widest font-black">Limpando cache e carregando dados</p>
+            <p className="text-white/20 text-[9px] uppercase tracking-widest font-black">Sincronizando Banco de Dados</p>
         </div>
       </div>
     );
@@ -192,11 +194,9 @@ const App: React.FC = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {/* Botão de Refresh Manual */}
           <button 
             onClick={handleForceRefresh}
             className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/40 hover:text-[#F4BE02] hover:bg-[#F4BE02]/10 transition-all active:scale-90"
-            title="Atualizar App e Cache"
           >
             <RefreshCw size={18} className={isSyncing ? 'animate-spin' : ''} />
           </button>
@@ -205,7 +205,7 @@ const App: React.FC = () => {
             {isSyncing ? <Loader2 size={12} className="text-yellow-500 animate-spin" /> : <CheckCircle2 size={12} className="text-green-500" />}
             <div className="flex flex-col">
                 <span className={`text-[8px] font-black uppercase ${isSyncing ? 'text-yellow-500' : 'text-green-500'}`}>
-                {isSyncing ? 'Sincronizando...' : 'Conectado'}
+                {isSyncing ? 'Gravando...' : 'Conectado'}
                 </span>
                 {!isSyncing && lastSyncTime && (
                     <span className="text-[6px] text-white/30 uppercase font-bold tracking-tighter">
@@ -221,10 +221,10 @@ const App: React.FC = () => {
 
       <nav className="fixed bottom-6 left-5 right-5 z-50 bg-[#151515] rounded-[28px] border border-white/10 p-2 flex justify-between shadow-2xl backdrop-blur-xl">
         <NavBtn active={currentScreen === 'DASHBOARD'} onClick={() => setCurrentScreen('DASHBOARD')} icon={<LayoutDashboard size={20} />} label="Início" />
-        <NavBtn active={currentScreen === 'SUMULAS'} onClick={() => setCurrentScreen('SUMULAS')} icon={<FileText size={20} />} label="Súmulas" />
-        <NavBtn active={currentScreen === 'CARTOLA'} onClick={() => setCurrentScreen('CARTOLA')} icon={<Crown size={20} />} label="Cartola" />
+        <NavBtn active={currentScreen === 'SUMULAS'} onClick={() => setCurrentScreen('SUMULAS'} icon={<FileText size={20} />} label="Súmulas" />
+        <NavBtn active={currentScreen === 'CARTOLA'} onClick={() => setCurrentScreen('CARTOLA'} icon={<Crown size={20} />} label="Cartola" />
         <NavBtn active={currentScreen === 'JOGADORES' || currentScreen === 'CADASTRO_JOGADOR' || currentScreen === 'EDITAR_JOGADOR'} onClick={() => setCurrentScreen('JOGADORES')} icon={<Users size={20} />} label="Elenco" />
-        <NavBtn active={currentScreen === 'FINANCEIRO'} onClick={() => setCurrentScreen('FINANCEIRO')} icon={<DollarSign size={20} />} label="Caixa" />
+        <NavBtn active={currentScreen === 'FINANCEIRO'} onClick={() => setCurrentScreen('FINANCEIRO'} icon={<DollarSign size={20} />} label="Caixa" />
       </nav>
     </div>
   );
