@@ -1,10 +1,10 @@
 
 /**
- * 100 FIRULA SOCIETY - DATABASE ENGINE v18.0 (WITH PLAYER NAMES)
- * Garante cabeçalhos em Português e inclui NOME ATLETA ao lado do ID.
+ * 100 FIRULA SOCIETY - DATABASE ENGINE v19.0 (DYNAMIC EVALUATION COLUMNS)
+ * Garante cabeçalhos em Português e gera colunas dinâmicas para cada avaliador.
  */
 
-// CONFIGURAÇÃO DOS CABEÇALHOS (PT-BR OBRIGATÓRIO)
+// CONFIGURAÇÃO DOS CABEÇALHOS FIXOS
 const CONFIG = {
   'JOGADORES': [
     'ID', 'NOME', 'POSIÇÃO', 'GOLS', 'ASSISTÊNCIAS', 'JOGOS', 
@@ -18,7 +18,7 @@ const CONFIG = {
     'FALTAS ADVERSÁRIO T1', 'FALTAS ADVERSÁRIO T2',
     'ÁRBITRO', 'LOGO RIVAL'
   ],
-  // ADICIONADO: NOME ATLETA (Índice 2)
+  // CABEÇALHOS FIXOS - Colunas dinâmicas serão adicionadas APÓS estes
   'LANCAMENTOS_ATLETAS': [
     'ID PARTIDA', 'ID ATLETA', 'NOME ATLETA', 'GOLS', 'ASSISTÊNCIAS', 'AMARELO', 'VERMELHO', 
     'FALTAS', 'GOL CONTRA', 'PÊNALTI SOFRIDO', 'PÊNALTI COMETIDO', 'PÊNALTI PERDIDO', 'NOTA MÉDIA', 'DETALHES_AVALIACAO'
@@ -26,7 +26,6 @@ const CONFIG = {
   'DESPESAS': [
     'ID', 'DATA', 'DESCRIÇÃO', 'VALOR', 'CATEGORIA'
   ],
-  // ADICIONADO: NOME ATLETA (Índice 1)
   'MENSALIDADES': [
     'ID ATLETA', 'NOME ATLETA', 'STATUS', 'VALOR', 'DATA PAGAMENTO'
   ],
@@ -38,21 +37,16 @@ const CONFIG = {
 function getOrCreateSheet(name) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(name);
+  // Nota: Para LANCAMENTOS_ATLETAS, não forçamos headers aqui para evitar sobrescrever os dinâmicos antes do POST
   const headers = CONFIG[name];
   
   if (!sheet) {
     sheet = ss.insertSheet(name);
-  }
-
-  // ATUALIZAÇÃO FORÇADA DE CABEÇALHOS
-  if (headers && headers.length > 0) {
-    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-    sheet.setFrozenRows(1);
-    
-    sheet.getRange(1, 1, 1, headers.length)
-         .setFontWeight("bold")
-         .setBackground(null)
-         .setBorder(true, true, true, true, null, null);
+    if (headers && headers.length > 0) {
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      sheet.setFrozenRows(1);
+      sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBorder(true, true, true, true, null, null);
+    }
   }
   return sheet;
 }
@@ -93,11 +87,9 @@ function doGet() {
     if (sheetL.getLastRow() > 1) {
       sheetL.getDataRange().getValues().slice(1).forEach(row => {
         if (!row[0]) return;
-        // ÍNDICES AJUSTADOS DEVIDO À NOVA COLUNA 'NOME ATLETA' (row[2])
         result.LANCAMENTOS_ATLETAS.push({ 
             idPartida: row[0].toString(), 
             idAtleta: row[1].toString(),
-            // row[2] é o Nome, ignoramos na leitura do app pois o app já tem os nomes via JOGADORES
             gols: Number(row[3]) || 0, 
             assistencias: Number(row[4]) || 0, 
             amarelo: Number(row[5]) || 0, 
@@ -125,10 +117,8 @@ function doGet() {
     if (sheetPayments.getLastRow() > 1) {
       sheetPayments.getDataRange().getValues().slice(1).forEach(row => {
         if (!row[0]) return;
-        // ÍNDICES AJUSTADOS DEVIDO À NOVA COLUNA 'NOME ATLETA' (row[1])
         result.PAYMENTS.push({ 
           playerId: row[0].toString(),
-          // row[1] é Nome
           status: row[2] ? row[2].toString() : "Pendente", 
           value: Number(row[3]) || 0, 
           paymentDate: formatDate(row[4]) 
@@ -157,60 +147,85 @@ function doPost(e) {
     const payload = JSON.parse(e.postData.contents);
     const allData = payload.data;
     
+    // Função genérica para planilhas simples
     const syncSheet = (name, dataRows) => {
       const sheet = getOrCreateSheet(name);
       const headers = CONFIG[name];
-      
       if (sheet.getLastRow() > 1) {
-        sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).clearContent();
+        // Limpa tudo exceto cabeçalho
+        sheet.getDataRange().offset(1, 0).clearContent();
       }
-      
       if (dataRows && dataRows.length > 0) {
         var cleanedRows = dataRows.map(row => row.map(cell => cell === null || cell === undefined ? "" : cell.toString()));
         sheet.getRange(2, 1, cleanedRows.length, headers.length).setValues(cleanedRows);
       }
     };
 
+    // 1. JOGADORES
     syncSheet('JOGADORES', allData.PLAYERS.map(p => [p.id, p.name, p.position, p.goals, p.assists, p.jogos, p.yellowCards, p.redCards, p.whatsapp, p.active === false ? 'Não' : 'Sim']));
     
+    // 2. PARTIDAS
     syncSheet('PARTIDAS', allData.PARTIDAS.map(m => [
       m.id, m.data, m.adversario, m.quadro, m.tecnico, m.amistoso, m.wo, m.notes, 
-      m.golsPro, m.golsContra, 
-      m.faltasTimeT1, m.faltasTimeT2, 
-      m.golsAdversarioT1, m.golsAdversarioT2, 
-      m.faltasAdversarioT1, m.faltasAdversarioT2, 
-      m.arbitro, m.logo
+      m.golsPro, m.golsContra, m.faltasTimeT1, m.faltasTimeT2, m.golsAdversarioT1, m.golsAdversarioT2, m.faltasAdversarioT1, m.faltasAdversarioT2, m.arbitro, m.logo
     ]));
 
-    // LANCAMENTOS AGORA INCLUEM NOME (l.nomeAtleta)
-    syncSheet('LANCAMENTOS_ATLETAS', allData.LANCAMENTOS_ATLETAS.map(l => [
-        l.idPartida, 
-        l.idAtleta,
-        l.nomeAtleta, // NOVO CAMPO
-        l.gols, 
-        l.assistencias, 
-        l.amarelo, 
-        l.vermelho, 
-        l.faltas, 
-        l.golContra, 
-        l.pSofri, 
-        l.pCometi, 
-        l.pPerd, 
-        l.nota, 
-        l.detalhesNota 
-    ]));
+    // 3. LANCAMENTOS_ATLETAS (LÓGICA DINÂMICA)
+    const sheetL = getOrCreateSheet('LANCAMENTOS_ATLETAS');
+    const fixedHeaders = CONFIG['LANCAMENTOS_ATLETAS'];
+    const lancamentosData = allData.LANCAMENTOS_ATLETAS || [];
 
+    // Identificar todas as chaves dinâmicas de avaliadores
+    let dynamicKeysSet = new Set();
+    lancamentosData.forEach(l => {
+      if (l._evals) {
+        Object.keys(l._evals).forEach(k => dynamicKeysSet.add(k));
+      }
+    });
+    // Ordenar chaves para consistência (Ex: AVAL: ANA, AVAL: BETO)
+    const dynamicHeaders = Array.from(dynamicKeysSet).sort();
+    
+    // Construir cabeçalho completo
+    const fullHeaders = [...fixedHeaders, ...dynamicHeaders];
+
+    // Atualizar cabeçalhos na planilha
+    if (sheetL.getLastColumn() < fullHeaders.length) {
+       // Se aumentou o número de colunas, limpa formatação antiga de header e refaz
+       sheetL.getRange(1, 1, 1, sheetL.getMaxColumns()).clearFormat();
+    }
+    sheetL.getRange(1, 1, 1, fullHeaders.length)
+          .setValues([fullHeaders])
+          .setFontWeight("bold")
+          .setBorder(true, true, true, true, null, null);
+
+    // Limpar dados antigos
+    if (sheetL.getLastRow() > 1) {
+       sheetL.getDataRange().offset(1, 0).clearContent();
+    }
+
+    // Mapear dados
+    if (lancamentosData.length > 0) {
+      const rows = lancamentosData.map(l => {
+        // Dados Fixos
+        const fixedData = [
+          l.idPartida, l.idAtleta, l.nomeAtleta, l.gols, l.assistencias, l.amarelo, l.vermelho, 
+          l.faltas, l.golContra, l.pSofri, l.pCometi, l.pPerd, l.nota, l.detalhesNota
+        ];
+        
+        // Dados Dinâmicos (Notas individuais)
+        const dynamicData = dynamicHeaders.map(headerKey => {
+           return (l._evals && l._evals[headerKey] !== undefined) ? l._evals[headerKey].toString().replace('.', ',') : "";
+        });
+
+        return [...fixedData, ...dynamicData].map(c => c === null || c === undefined ? "" : c.toString());
+      });
+      
+      sheetL.getRange(2, 1, rows.length, fullHeaders.length).setValues(rows);
+    }
+
+    // 4. OUTRAS PLANILHAS
     syncSheet('DESPESAS', allData.EXPENSES.map(ex => [ex.id, ex.date, ex.description, ex.value, ex.category]));
-    
-    // MENSALIDADES AGORA INCLUEM NOME (py.nomeAtleta)
-    syncSheet('MENSALIDADES', allData.PAYMENTS.map(py => [
-      py.playerId,
-      py.nomeAtleta, // NOVO CAMPO
-      py.status, 
-      py.value, 
-      py.paymentDate || ""
-    ]));
-    
+    syncSheet('MENSALIDADES', allData.PAYMENTS.map(py => [py.playerId, py.nomeAtleta, py.status, py.value, py.paymentDate || ""]));
     syncSheet('REGRAS_CARTOLA', allData.RULES.map(r => [r.id, r.label, r.category, r.value, r.active ? 'Sim' : 'Não', r.type]));
 
     SpreadsheetApp.flush();

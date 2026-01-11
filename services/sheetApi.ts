@@ -1,7 +1,7 @@
 
 import { Player, Match, Expense, Payment, ScoringRule, MatchEvent, HalfStats, RatingDetail } from '../types';
 
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxDg-l1cNY1x-1u-71_jSd-8659UPtHGFQSeXv_tUf6ktC7B7SlRas81dpI7t8a9dZY7w/exec';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby3Hcx-lQ40h9Vf09Xf77lNLYDAVpuh9QEE1T6-85phgDc-4I5ztG-iX-qwsZbbwmzBwg/exec';
 
 const ensureISO = (val: any): string => {
   if (!val) return '';
@@ -92,10 +92,6 @@ export const api = {
           const t2Events: MatchEvent[] = [];
           matchLaunchings.forEach((l: any) => {
             const pid = l.idAtleta.toString();
-            // AJUSTE: Indices antigos comentados. Os dados vêm via JSON com chaves, então aqui não muda nada se a API retornar objeto. 
-            // Se a API retornar array de arrays, precisaria ajustar os índices. 
-            // Como o Apps Script retorna JSON com chaves (gols, assistencias...), só precisamos garantir que o Apps Script populou essas chaves corretamente.
-            // O Apps Script atualizado popula 'gols' lendo da coluna correta.
             
             const gols = Number(l.gols) || 0;
             const assists = Number(l.assistencias) || 0;
@@ -168,25 +164,36 @@ export const api = {
 
   async syncAllData(allData: { PLAYERS: Player[], MATCHES: Match[], EXPENSES: Expense[], PAYMENTS: Payment[], RULES: ScoringRule[] }) {
     try {
-      // Prepara os dados auxiliares (pagamentos e lançamentos) enriquecidos com o nome do jogador
+      // Cria Mapa de ID -> Nome para uso rápido
+      const playerMap = new Map<string, string>();
+      allData.PLAYERS.forEach(p => playerMap.set(p.id, p.name));
+
       const lancamentos: any[] = [];
       
       allData.MATCHES.forEach(m => {
         const uniquePlayers = new Set([...(m.roster || []), ...Object.keys(m.playerRatings || {})]);
         uniquePlayers.forEach(pid => {
-          const player = allData.PLAYERS.find(p => p.id === pid);
-          const playerName = player ? player.name : 'DESCONHECIDO';
+          const playerName = playerMap.get(pid) || 'DESCONHECIDO';
           
           const events = [...m.stats.tempo1.events, ...m.stats.tempo2.events].filter(e => e.playerId === pid);
           
-          // Prepara detalhes para JSON
+          // Prepara detalhes para JSON e para Colunas Dinâmicas
           const details = m.detailedRatings?.[pid] || [];
           const detailsJson = details.length > 0 ? JSON.stringify(details) : "";
+          
+          // Cria objeto de avaliações individuais: { "NOTA [JOAO]": 9.5, "NOTA [MARIA]": 8.0 }
+          const evalColumns: Record<string, number> = {};
+          details.forEach(d => {
+             const evaluatorName = playerMap.get(d.evaluatorId);
+             if (evaluatorName) {
+                 evalColumns[`AVAL: ${evaluatorName}`] = d.score;
+             }
+          });
 
           lancamentos.push({ 
               idPartida: m.id, 
               idAtleta: pid,
-              nomeAtleta: playerName, // ENVIANDO O NOME
+              nomeAtleta: playerName, 
               gols: events.filter(e => e.type === 'GOL').length, 
               assistencias: events.filter(e => e.type === 'ASSIST').length, 
               amarelo: events.filter(e => e.type === 'AMARELO').length, 
@@ -197,16 +204,16 @@ export const api = {
               pCometi: events.filter(e => e.type === 'PENALTI_COMETIDO').length, 
               pPerd: events.filter(e => e.type === 'PENALTI_PERDIDO').length, 
               nota: m.playerRatings?.[pid] || 0,
-              detalhesNota: detailsJson 
+              detalhesNota: detailsJson,
+              _evals: evalColumns // Objeto especial para o backend processar colunas dinâmicas
           });
         });
       });
 
       const pagamentosEnriquecidos = allData.PAYMENTS.map(py => {
-          const player = allData.PLAYERS.find(p => p.id === py.playerId);
           return {
             playerId: py.playerId.toString(),
-            nomeAtleta: player ? player.name : 'DESCONHECIDO', // ENVIANDO O NOME
+            nomeAtleta: playerMap.get(py.playerId) || 'DESCONHECIDO',
             status: `${py.status} | ${py.month}`,
             value: Number(py.value) || 0,
             paymentDate: toBRDate(py.paymentDate)
