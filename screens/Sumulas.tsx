@@ -1,11 +1,10 @@
-
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Match, Player, EventType, MatchEvent, HalfStats } from '../types';
 import { 
   Plus, X, Calendar, Save, Minus, CheckCircle2, Pencil, 
   Trophy, Star, Crown, Users, Check, Square, ShieldAlert,
   Zap, Target, AlertTriangle, Trash2, ChevronRight, UserCheck,
-  Ban, MinusCircle, AlertCircle, UserCog
+  Ban, MinusCircle, AlertCircle, UserCog, Filter, ChevronDown
 } from 'lucide-react';
 
 interface Props {
@@ -17,12 +16,66 @@ interface Props {
 type QuadroType = 'Quadro 1' | 'Quadro 2';
 
 const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
+  const currentYear = new Date().getFullYear().toString();
   const [showForm, setShowForm] = useState(false);
   const [showRosterModal, setShowRosterModal] = useState(false);
   const [ratingMatchId, setRatingMatchId] = useState<string | null>(null);
   const [tempRatings, setTempRatings] = useState<Record<string, number>>({});
   const [currentTempo, setCurrentTempo] = useState<1 | 2>(1);
   const [activeStep, setActiveStep] = useState<'info' | 'events'>('info');
+
+  // --- LÓGICA DE FILTROS INTELIGENTES ---
+  const [filterYear, setFilterYear] = useState(currentYear);
+  const [filterQuadro, setFilterQuadro] = useState('Todos');
+
+  // 1. Extrair Anos disponíveis com base nas partidas existentes
+  const availableYears = useMemo(() => {
+    const years = new Set<string>();
+    matches.forEach(m => {
+      if (m.date) {
+        const y = String(m.date).split('-')[0];
+        if (y && y.length === 4) years.add(y);
+      }
+    });
+    years.add(currentYear); // Sempre inclui o ano atual
+    return Array.from(years).sort().reverse();
+  }, [matches, currentYear]);
+
+  // 2. Extrair Quadros disponíveis naquele ano selecionado
+  const availableQuadros = useMemo(() => {
+    const quadros = new Set<string>();
+    matches.forEach(m => {
+        const y = String(m.date).split('-')[0];
+        if (y === filterYear) {
+            quadros.add(m.label);
+        }
+    });
+    // Sempre garante as opções padrão se não houver dados
+    if (quadros.size === 0) {
+        quadros.add('Quadro 1');
+        quadros.add('Quadro 2');
+    }
+    return Array.from(quadros).sort();
+  }, [matches, filterYear]);
+
+  // 3. Filtrar as partidas
+  const filteredMatches = useMemo(() => {
+    return matches.filter(m => {
+        const mYear = String(m.date).split('-')[0];
+        const yearMatch = mYear === filterYear;
+        const quadroMatch = filterQuadro === 'Todos' || m.label === filterQuadro;
+        return yearMatch && quadroMatch;
+    });
+  }, [matches, filterYear, filterQuadro]);
+
+  // Resetar quadro para 'Todos' se mudar de ano e o quadro não existir (opcional, mas boa UX)
+  useEffect(() => {
+      if (filterQuadro !== 'Todos' && !availableQuadros.includes(filterQuadro)) {
+          setFilterQuadro('Todos');
+      }
+  }, [filterYear, availableQuadros]);
+
+  // --------------------------------------
 
   const createEmptyHalf = (): HalfStats => ({ fouls: 0, opponentGoals: 0, opponentFouls: 0, events: [] });
 
@@ -68,7 +121,10 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
   };
 
   const handleEditMatch = (match: Match) => {
-    setFormMatch(JSON.parse(JSON.stringify(match)));
+    setFormMatch({
+      ...JSON.parse(JSON.stringify(match)),
+      roster: match.roster || []
+    });
     setActiveStep('info');
     setShowForm(true);
   };
@@ -192,15 +248,16 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
     return players.find(p => p.id === mvpId)?.name || null;
   };
 
+  // USA filteredMatches aqui para o agrupamento
   const groupedMatches = useMemo(() => {
     const groups: Record<string, Match[]> = {};
-    matches.forEach(m => {
+    filteredMatches.forEach(m => {
       const dateKey = m.date || 'Sem Data';
       if (!groups[dateKey]) groups[dateKey] = [];
       groups[dateKey].push(m);
     });
     return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
-  }, [matches]);
+  }, [filteredMatches]);
 
   const getEventIcon = (type: EventType) => {
     switch (type) {
@@ -471,7 +528,39 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
           )}
         </div>
       ) : (
-        <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="space-y-6 animate-in fade-in duration-500">
+           
+           {/* FILTROS DE PESQUISA (SÓ APARECE QUANDO FORM ESTÁ FECHADO) */}
+           <div className="bg-[#0A0A0A] p-4 rounded-3xl border border-white/5 space-y-3">
+             <div className="flex items-center gap-2 px-1">
+                <Filter size={14} className="text-[#F4BE02]" />
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Filtros de Súmula</span>
+             </div>
+             <div className="grid grid-cols-2 gap-2">
+                <div className="relative">
+                    <select 
+                        value={filterYear} 
+                        onChange={e => setFilterYear(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-4 pr-10 text-[10px] font-black uppercase tracking-widest appearance-none outline-none focus:border-[#F4BE02]/50 transition-all text-white"
+                    >
+                        {availableYears.map(y => <option key={y} value={y} className="text-black bg-white">{y}</option>)}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 pointer-events-none" />
+                </div>
+                <div className="relative">
+                    <select 
+                        value={filterQuadro} 
+                        onChange={e => setFilterQuadro(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-4 pr-10 text-[10px] font-black uppercase tracking-widest appearance-none outline-none focus:border-[#F4BE02]/50 transition-all text-white"
+                    >
+                        <option value="Todos" className="text-black bg-white">Todos</option>
+                        {availableQuadros.map(q => <option key={q} value={q} className="text-black bg-white">{q}</option>)}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 pointer-events-none" />
+                </div>
+             </div>
+           </div>
+
            {groupedMatches.length > 0 ? groupedMatches.map(([date, dayMatches]) => {
              return (
                <div key={date} className="space-y-4">
@@ -540,7 +629,7 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
            }) : (
              <div className="text-center py-24 opacity-10 flex flex-col items-center gap-4">
                 <Trophy size={80} strokeWidth={0.5} />
-                <p className="text-[10px] font-black uppercase tracking-[0.4em]">Sem Jogos Registrados</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.4em]">Sem Jogos Registrados para este filtro</p>
              </div>
            )}
         </div>

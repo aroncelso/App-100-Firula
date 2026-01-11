@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Trophy, 
@@ -221,10 +220,10 @@ const App: React.FC = () => {
 
       <nav className="fixed bottom-6 left-5 right-5 z-50 bg-[#151515] rounded-[28px] border border-white/10 p-2 flex justify-between shadow-2xl backdrop-blur-xl">
         <NavBtn active={currentScreen === 'DASHBOARD'} onClick={() => setCurrentScreen('DASHBOARD')} icon={<LayoutDashboard size={20} />} label="Início" />
-        <NavBtn active={currentScreen === 'SUMULAS'} onClick={() => setCurrentScreen('SUMULAS'} icon={<FileText size={20} />} label="Súmulas" />
-        <NavBtn active={currentScreen === 'CARTOLA'} onClick={() => setCurrentScreen('CARTOLA'} icon={<Crown size={20} />} label="Cartola" />
+        <NavBtn active={currentScreen === 'SUMULAS'} onClick={() => setCurrentScreen('SUMULAS')} icon={<FileText size={20} />} label="Súmulas" />
+        <NavBtn active={currentScreen === 'CARTOLA'} onClick={() => setCurrentScreen('CARTOLA')} icon={<Crown size={20} />} label="Cartola" />
         <NavBtn active={currentScreen === 'JOGADORES' || currentScreen === 'CADASTRO_JOGADOR' || currentScreen === 'EDITAR_JOGADOR'} onClick={() => setCurrentScreen('JOGADORES')} icon={<Users size={20} />} label="Elenco" />
-        <NavBtn active={currentScreen === 'FINANCEIRO'} onClick={() => setCurrentScreen('FINANCEIRO'} icon={<DollarSign size={20} />} label="Caixa" />
+        <NavBtn active={currentScreen === 'FINANCEIRO'} onClick={() => setCurrentScreen('FINANCEIRO')} icon={<DollarSign size={20} />} label="Caixa" />
       </nav>
     </div>
   );

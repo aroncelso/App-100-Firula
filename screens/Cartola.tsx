@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Match, Player, EventType, ScoringRule } from '../types';
-import { Trophy, Calendar, Crown, Medal, UserCog, Info, Star, Target, Zap, Shield, ShieldAlert, Square, Ban, Footprints, Flame, AlertCircle, ToggleLeft, ToggleRight, Edit3 } from 'lucide-react';
+import { Trophy, Calendar, Crown, Medal, UserCog, Info, Star, Target, Zap, Shield, ShieldAlert, Square, Ban, Footprints, Flame, AlertCircle, ToggleLeft, ToggleRight, Edit3, ChevronDown, ChevronUp, Activity } from 'lucide-react';
 
 interface Props {
   matches: Match[];
@@ -14,6 +14,7 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
   const currentYear = new Date().getFullYear().toString();
   const [selectedYear, setSelectedYear] = useState<string>(currentYear);
   const [activeTab, setActiveTab] = useState<'ranking' | 'regras'>('ranking');
+  const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
 
   const availableYears = useMemo(() => {
     const years = new Set<string>();
@@ -38,6 +39,21 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
   const calculateCartolaStats = (player: Player) => {
       let totalPoints = 0;
       let matchesCount = 0;
+      
+      // Armazena detalhes: { 'GOAL_FWD': { count: 3, points: 24, label: 'Gol de Atacante' } }
+      const breakdown: Record<string, { count: number, points: number, label: string, type: 'positive' | 'negative' | 'coach' }> = {};
+
+      const track = (ruleId: string) => {
+          const rule = rules.find(r => r.id === ruleId);
+          if (!rule || !rule.active) return 0;
+          
+          if (!breakdown[ruleId]) {
+              breakdown[ruleId] = { count: 0, points: 0, label: rule.label, type: rule.type };
+          }
+          breakdown[ruleId].count++;
+          breakdown[ruleId].points += rule.value;
+          return rule.value;
+      };
 
       matches.forEach(match => {
           if (!match.date || String(match.date).split('-')[0] !== selectedYear || match.isFriendly) return;
@@ -52,10 +68,10 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
                         match.stats.tempo2.events.filter(e => e.type === 'GOL').length;
              const them = (match.stats.tempo1.opponentGoals || 0) + (match.stats.tempo2.opponentGoals || 0);
              
-             if (match.wo === 'win') matchPoints += getRuleValue('COACH_WIN');
+             if (match.wo === 'win') matchPoints += track('COACH_WIN');
              else if (match.wo === 'loss') {} // 0
-             else if (us > them) matchPoints += getRuleValue('COACH_WIN');
-             else if (us === them) matchPoints += getRuleValue('COACH_DRAW');
+             else if (us > them) matchPoints += track('COACH_WIN');
+             else if (us === them) matchPoints += track('COACH_DRAW');
           }
 
           // 2. PLAYER POINTS
@@ -67,28 +83,28 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
               playerEvents.forEach(e => {
                   switch (e.type) {
                       case 'GOL': 
-                        if (player.position === 'Goleiro') matchPoints += getRuleValue('GOAL_GK');
-                        else if (player.position === 'Zagueiro') matchPoints += getRuleValue('GOAL_DEF');
-                        else if (player.position === 'Meio-Campo') matchPoints += getRuleValue('GOAL_MID');
-                        else if (player.position === 'Atacante') matchPoints += getRuleValue('GOAL_FWD');
+                        if (player.position === 'Goleiro') matchPoints += track('GOAL_GK');
+                        else if (player.position === 'Zagueiro') matchPoints += track('GOAL_DEF');
+                        else if (player.position === 'Meio-Campo') matchPoints += track('GOAL_MID');
+                        else if (player.position === 'Atacante') matchPoints += track('GOAL_FWD');
                         break;
-                      case 'ASSIST': matchPoints += getRuleValue('ASSIST'); break;
-                      case 'FALTA': matchPoints += getRuleValue('FOUL'); break;
-                      case 'AMARELO': matchPoints += getRuleValue('YELLOW'); break;
-                      case 'VERMELHO': matchPoints += getRuleValue('RED'); break;
-                      case 'DEFESA_PENALTI': matchPoints += getRuleValue('DEF_PENALTY'); break;
-                      case 'GOL_CONTRA': matchPoints += getRuleValue('OWN_GOAL'); break;
-                      case 'PENALTI_PERDIDO': matchPoints += getRuleValue('MISSED_PENALTY'); break;
+                      case 'ASSIST': matchPoints += track('ASSIST'); break;
+                      case 'FALTA': matchPoints += track('FOUL'); break;
+                      case 'AMARELO': matchPoints += track('YELLOW'); break;
+                      case 'VERMELHO': matchPoints += track('RED'); break;
+                      case 'DEFESA_PENALTI': matchPoints += track('DEF_PENALTY'); break;
+                      case 'GOL_CONTRA': matchPoints += track('OWN_GOAL'); break;
+                      case 'PENALTI_PERDIDO': matchPoints += track('MISSED_PENALTY'); break;
                   }
               });
 
               const goalsConceded = (match.stats.tempo1.opponentGoals || 0) + (match.stats.tempo2.opponentGoals || 0);
               if (player.position === 'Goleiro') {
-                  matchPoints += (goalsConceded * getRuleValue('GOAL_CONCEDED'));
-                  if (goalsConceded === 0) matchPoints += getRuleValue('CLEAN_SHEET');
+                  for(let i=0; i<goalsConceded; i++) matchPoints += track('GOAL_CONCEDED');
+                  if (goalsConceded === 0) matchPoints += track('CLEAN_SHEET');
               }
               if (player.position === 'Zagueiro') {
-                  if (goalsConceded === 0) matchPoints += getRuleValue('CLEAN_SHEET');
+                  if (goalsConceded === 0) matchPoints += track('CLEAN_SHEET');
               }
           }
 
@@ -101,7 +117,8 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
       return {
           totalPoints,
           matchesCount,
-          average: matchesCount > 0 ? (totalPoints / matchesCount).toFixed(1) : '0.0'
+          average: matchesCount > 0 ? (totalPoints / matchesCount).toFixed(1) : '0.0',
+          breakdown
       };
   };
 
@@ -121,6 +138,23 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
 
   const toggleRule = (id: string) => {
     setRules(prev => prev.map(r => r.id === id ? { ...r, active: !r.active } : r));
+  };
+
+  const toggleExpand = (playerId: string) => {
+      setExpandedPlayerId(prev => prev === playerId ? null : playerId);
+  };
+
+  const getRuleIcon = (label: string) => {
+      const l = label.toLowerCase();
+      if (l.includes('gol') && !l.includes('contra') && !l.includes('sofrido')) return <Target size={12} />;
+      if (l.includes('assist')) return <Zap size={12} />;
+      if (l.includes('clean') || l.includes('sg')) return <Shield size={12} />;
+      if (l.includes('amarelo')) return <Square size={12} fill="currentColor" className="text-yellow-500"/>;
+      if (l.includes('vermelho')) return <Square size={12} fill="currentColor" className="text-red-500"/>;
+      if (l.includes('falta')) return <AlertCircle size={12} />;
+      if (l.includes('técnico')) return <UserCog size={12} />;
+      if (l.includes('defesa')) return <Activity size={12} />;
+      return <Star size={12} />;
   };
 
   return (
@@ -166,9 +200,12 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
                       const rank = index + 1;
                       const isTop3 = rank <= 3;
                       const playerName = player.name || '';
+                      const isExpanded = expandedPlayerId === player.id;
+                      const hasDetails = Object.keys(player.stats.breakdown).length > 0;
+
                       return (
                           <div key={player.id} className="relative group">
-                              <div className={`absolute -left-2 -top-2 w-8 h-8 rounded-full flex items-center justify-center font-display font-bold text-sm shadow-xl z-20 border-2
+                              <div className={`absolute -left-2 top-4 w-8 h-8 rounded-full flex items-center justify-center font-display font-bold text-sm shadow-xl z-20 border-2 transition-all
                                   ${rank === 1 ? 'bg-[#F4BE02] text-black border-white' : 
                                     rank === 2 ? 'bg-[#C0C0C0] text-black border-white' : 
                                     rank === 3 ? 'bg-[#CD7F32] text-black border-white' : 
@@ -177,33 +214,66 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
                               >
                                   {rank}
                               </div>
-                              <div className={`bg-[#0A0A0A] p-4 pl-8 rounded-[24px] border transition-all flex items-center justify-between
+                              <button 
+                                onClick={() => toggleExpand(player.id)}
+                                className={`w-full bg-[#0A0A0A] p-4 pl-8 rounded-[24px] border transition-all flex flex-col cursor-pointer
                                   ${isTop3 ? 'border-[#F4BE02]/20 shadow-[0_4px_20px_rgba(244,190,2,0.05)]' : 'border-white/[0.06] hover:border-white/10'}
-                              `}>
-                                   <div className="flex items-center gap-4">
-                                       <div className="relative">
-                                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-display font-bold text-lg border
-                                            ${rank === 1 ? 'bg-[#F4BE02]/10 text-[#F4BE02] border-[#F4BE02]/20' : 'bg-white/5 text-white/60 border-white/10'}`}>
-                                              {playerName.charAt(0) || '?'}
-                                          </div>
+                                  ${isExpanded ? 'bg-white/[0.02]' : ''}
+                                `}
+                              >
+                                   <div className="flex items-center justify-between w-full">
+                                       <div className="flex items-center gap-4">
+                                           <div className="relative">
+                                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-display font-bold text-lg border
+                                                ${rank === 1 ? 'bg-[#F4BE02]/10 text-[#F4BE02] border-[#F4BE02]/20' : 'bg-white/5 text-white/60 border-white/10'}`}>
+                                                  {playerName.charAt(0) || '?'}
+                                              </div>
+                                           </div>
+                                           <div className="text-left">
+                                               <div className="flex items-center gap-2">
+                                                 <h3 className="font-bold text-sm text-white">{playerName}</h3>
+                                                 <span className="text-[8px] font-black uppercase tracking-wider text-white/30 px-1.5 py-0.5 rounded bg-white/5">{player.position}</span>
+                                               </div>
+                                               <div className="flex items-center gap-3 mt-1 text-[9px] text-white/40 font-bold uppercase tracking-wider">
+                                                   <span>{player.stats.matchesCount} Jogos</span>
+                                                   <span className="w-1 h-1 rounded-full bg-white/20"></span>
+                                                   <span className="flex items-center gap-1">Média {player.stats.average}</span>
+                                               </div>
+                                           </div>
                                        </div>
-                                       <div>
-                                           <div className="flex items-center gap-2">
-                                             <h3 className="font-bold text-sm text-white">{playerName}</h3>
-                                             <span className="text-[8px] font-black uppercase tracking-wider text-white/30 px-1.5 py-0.5 rounded bg-white/5">{player.position}</span>
-                                           </div>
-                                           <div className="flex items-center gap-3 mt-1 text-[9px] text-white/40 font-bold uppercase tracking-wider">
-                                               <span>{player.stats.matchesCount} Jogos</span>
-                                               <span className="w-1 h-1 rounded-full bg-white/20"></span>
-                                               <span className="flex items-center gap-1">Média {player.stats.average}</span>
-                                           </div>
+                                       <div className="flex items-center gap-4">
+                                            <div className="text-right">
+                                                <p className="text-2xl font-display font-bold text-[#F4BE02] leading-none">{player.stats.totalPoints.toFixed(1)}</p>
+                                                <p className="text-[8px] font-black uppercase tracking-widest text-white/30 mt-1">Pontos Totais</p>
+                                            </div>
+                                            {isExpanded ? <ChevronUp size={16} className="text-white/20"/> : <ChevronDown size={16} className="text-white/20"/>}
                                        </div>
                                    </div>
-                                   <div className="text-right">
-                                       <p className="text-2xl font-display font-bold text-[#F4BE02] leading-none">{player.stats.totalPoints.toFixed(1)}</p>
-                                       <p className="text-[8px] font-black uppercase tracking-widest text-white/30 mt-1">Pontos Totais</p>
-                                   </div>
-                              </div>
+
+                                   {/* AREA DE DETALHES EXPANSÍVEL */}
+                                   {isExpanded && hasDetails && (
+                                       <div className="w-full mt-6 pt-6 border-t border-white/5 animate-in fade-in slide-in-from-top-2">
+                                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                               {Object.values(player.stats.breakdown).sort((a,b) => b.points - a.points).map((item, idx) => (
+                                                   <div key={idx} className="flex items-center justify-between bg-white/[0.03] p-2.5 rounded-xl border border-white/[0.02]">
+                                                       <div className="flex items-center gap-2">
+                                                            <div className={`p-1.5 rounded-lg ${item.points > 0 ? 'bg-[#F4BE02]/10 text-[#F4BE02]' : 'bg-red-500/10 text-red-500'}`}>
+                                                                {getRuleIcon(item.label)}
+                                                            </div>
+                                                            <div className="flex flex-col">
+                                                                <span className="text-[9px] font-bold text-white/80 leading-tight uppercase">{item.label}</span>
+                                                                <span className="text-[8px] font-black text-white/30 uppercase tracking-widest">{item.count}x</span>
+                                                            </div>
+                                                       </div>
+                                                       <span className={`text-xs font-bold font-display ${item.points > 0 ? 'text-[#F4BE02]' : 'text-red-500'}`}>
+                                                           {item.points > 0 ? '+' : ''}{item.points}
+                                                       </span>
+                                                   </div>
+                                               ))}
+                                           </div>
+                                       </div>
+                                   )}
+                              </button>
                           </div>
                       )
                   })}
@@ -218,7 +288,6 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
                   </div>
                   <div className="grid grid-cols-1 gap-2">
                       {rules.filter(r => r.type === 'positive').map(rule => (
-                        // Fix: explicitly pass key and ensure component type supports it in JSX
                         <EditableRegraCard key={rule.id} rule={rule} onValueChange={updateRuleValue} onToggle={toggleRule} />
                       ))}
                   </div>
@@ -231,7 +300,6 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
                   </div>
                   <div className="grid grid-cols-1 gap-2">
                       {rules.filter(r => r.type === 'coach').map(rule => (
-                        // Fix: explicitly pass key and ensure component type supports it in JSX
                         <EditableRegraCard key={rule.id} rule={rule} onValueChange={updateRuleValue} onToggle={toggleRule} />
                       ))}
                   </div>
@@ -244,7 +312,6 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
                   </div>
                   <div className="grid grid-cols-1 gap-2">
                       {rules.filter(r => r.type === 'negative').map(rule => (
-                        // Fix: explicitly pass key and ensure component type supports it in JSX
                         <EditableRegraCard key={rule.id} rule={rule} onValueChange={updateRuleValue} onToggle={toggleRule} />
                       ))}
                   </div>
@@ -255,14 +322,12 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
   );
 };
 
-// Fix: Define explicit interface for sub-component props to allow 'key' and provide better type safety
 interface EditableRegraCardProps {
   rule: ScoringRule;
   onValueChange: (id: string, value: string) => void;
   onToggle: (id: string) => void;
 }
 
-// Fix: Correctly type the sub-component as React.FC to allow 'key' prop in JSX map iterations
 const EditableRegraCard: React.FC<EditableRegraCardProps> = ({ rule, onValueChange, onToggle }) => (
     <div className={`bg-[#0A0A0A] p-4 rounded-2xl border transition-all flex items-center justify-between ${rule.active ? 'border-white/[0.05]' : 'border-red-500/20 opacity-40'}`}>
         <div className="flex items-center gap-3">

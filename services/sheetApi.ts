@@ -1,7 +1,7 @@
 
 import { Player, Match, Expense, Payment, ScoringRule, MatchEvent, HalfStats } from '../types';
 
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyn7ladV4hXxBkgP8gEs87FYWxFoh0-z0Yg6lHlW-hfyYnwtaUbotJSMa6EKxDr__Hx8A/exec';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby4vKQnElmeClR0tvFpi2MemtVd_P1Xw4LuNQ7cNmpr9DQSOqpRhioc3nFO5eqlOhX7bg/exec';
 
 const ensureISO = (val: any): string => {
   if (!val) return '';
@@ -103,13 +103,22 @@ export const api = {
           PLAYERS: (data.PLAYERS || []).map((p: any) => ({ ...p, id: p.id.toString(), goals: Number(p.goals) || 0, assists: Number(p.assistencias) || 0, matchesPlayed: Number(p.jogos) || 0, active: p.active !== 'Não' })),
           MATCHES: matches,
           EXPENSES: (data.EXPENSES || []).map((ex: any) => ({ id: ex.id.toString(), description: ex.description || ex.descricao || '', value: Number(ex.value || ex.valor) || 0, date: ensureISO(ex.date || ex.data), category: ex.category || ex.categoria || 'Variável' })),
-          PAYMENTS: (data.PAYMENTS || []).map((py: any) => ({
-            playerId: py.playerId.toString(),
-            month: 'Geral',
-            status: py.status as 'Pago' | 'Pendente',
-            value: Number(py.value) || 0,
-            paymentDate: ensureISO(py.paymentDate)
-          })),
+          
+          // LÓGICA DE DADOS COMPOSTOS: Extrai mês do status
+          PAYMENTS: (data.PAYMENTS || []).map((py: any) => {
+            const rawStatus = py.status || '';
+            const parts = rawStatus.split('|');
+            const realStatus = parts[0] ? parts[0].trim() : 'Pendente';
+            const monthRef = parts[1] ? parts[1].trim() : 'Geral';
+            
+            return {
+              playerId: py.playerId.toString(),
+              month: monthRef, 
+              status: realStatus as 'Pago' | 'Pendente',
+              value: Number(py.value) || 0,
+              paymentDate: ensureISO(py.paymentDate)
+            };
+          }),
           RULES: Array.isArray(data.RULES) ? data.RULES : []
         };
       }
@@ -134,9 +143,11 @@ export const api = {
           })),
           LANCAMENTOS_ATLETAS: [],
           EXPENSES: allData.EXPENSES.map(ex => ({ id: ex.id, date: toBRDate(ex.date), description: ex.description, value: ex.value, category: ex.category })),
+          
+          // LÓGICA DE DADOS COMPOSTOS: Concatena Status e Mês na mesma coluna
           PAYMENTS: allData.PAYMENTS.map(py => ({
             playerId: py.playerId.toString(),
-            status: py.status,
+            status: `${py.status} | ${py.month}`, // Formato: "Pago | Janeiro/2026"
             value: Number(py.value) || 0,
             paymentDate: toBRDate(py.paymentDate)
           })),
