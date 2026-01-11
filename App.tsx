@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   Trophy, 
@@ -20,6 +21,8 @@ import Finance from './screens/Finance';
 import PlayerForm from './screens/PlayerForm';
 import Cartola from './screens/Cartola';
 import { api } from './services/sheetApi';
+
+const APP_VERSION = '1.0.1';
 
 const MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -217,6 +220,12 @@ const App: React.FC = () => {
       </header>
 
       <main className="flex-1 px-5 pt-6">{renderScreen()}</main>
+
+      <div className="w-full text-center py-6">
+        <p className="text-[8px] font-black uppercase tracking-widest text-white/10 transition-colors hover:text-white/20">
+          Desenvolvido por Aron Celso • v{APP_VERSION}
+        </p>
+      </div>
 
       <nav className="fixed bottom-6 left-5 right-5 z-50 bg-[#151515] rounded-[28px] border border-white/10 p-2 flex justify-between shadow-2xl backdrop-blur-xl">
         <NavBtn active={currentScreen === 'DASHBOARD'} onClick={() => setCurrentScreen('DASHBOARD')} icon={<LayoutDashboard size={20} />} label="Início" />
