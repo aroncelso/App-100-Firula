@@ -43,7 +43,18 @@ const Dashboard: React.FC<Props> = ({ players, matches }) => {
     });
   }, [matches, selectedYears, selectedQuadros]);
 
-  const lastMatch = filteredMatches[filteredMatches.length - 1];
+  // --- LAST ROUND LOGIC (SHOW BOTH MATCHES) ---
+  const lastRoundMatches = useMemo(() => {
+    if (filteredMatches.length === 0) return [];
+    
+    // Pega a data da última partida encontrada no filtro
+    const lastDate = filteredMatches[filteredMatches.length - 1].date;
+    
+    // Retorna TODAS as partidas dessa data (para mostrar Q1 e Q2 juntos), ordenadas por Quadro
+    return matches
+        .filter(m => m.date === lastDate)
+        .sort((a, b) => a.label.localeCompare(b.label));
+  }, [filteredMatches, matches]);
 
   // --- 1. TEAM STATS CALCULATION ---
   const teamStats = useMemo(() => {
@@ -149,8 +160,6 @@ const Dashboard: React.FC<Props> = ({ players, matches }) => {
     return { home, away }; 
   };
 
-  const lastScore = lastMatch ? getLastMatchScore(lastMatch) : { home: 0, away: 0 };
-
   const toggleFilter = (list: string[], item: string, setter: (val: string[]) => void) => {
     if (list.includes(item)) {
       if (list.length > 1) setter(list.filter(i => i !== item));
@@ -248,46 +257,59 @@ const Dashboard: React.FC<Props> = ({ players, matches }) => {
         </div>
       </div>
 
-      {/* --- LAST MATCH SECTION --- */}
-      {lastMatch && (
+      {/* --- LAST ROUND SECTION (BOTH MATCHES) --- */}
+      {lastRoundMatches.length > 0 && (
         <section>
           <div className="flex items-center justify-between mb-4 px-1">
-            <h3 className="text-xs font-black uppercase tracking-widest text-white/40">Última Súmula do Filtro</h3>
+            <h3 className="text-xs font-black uppercase tracking-widest text-white/40">
+                Última Rodada ({String(lastRoundMatches[0].date).split('-').reverse().join('/')})
+            </h3>
           </div>
           
-          <div className="bg-[#0A0A0A] rounded-[24px] border border-white/[0.06] p-6 relative overflow-hidden">
-             <div className="absolute top-4 left-0 right-0 flex justify-center">
-                 <div className="bg-white/5 border border-white/10 px-3 py-1 rounded-full backdrop-blur-md">
-                     <span className="text-[9px] font-black text-white/60 uppercase tracking-widest">{lastMatch.label} - {String(lastMatch.date).split('-')[0]}</span>
-                 </div>
-             </div>
+          <div className="grid grid-cols-1 gap-4">
+             {lastRoundMatches.map(match => {
+                 const score = getLastMatchScore(match);
+                 return (
+                    <div key={match.id} className="bg-[#0A0A0A] rounded-[24px] border border-white/[0.06] p-6 relative overflow-hidden">
+                        <div className="absolute top-4 left-0 right-0 flex justify-center">
+                            <div className="bg-white/5 border border-white/10 px-3 py-1 rounded-full backdrop-blur-md">
+                                <span className="text-[9px] font-black text-white/60 uppercase tracking-widest">{match.label}</span>
+                            </div>
+                        </div>
 
-            <div className="flex items-center justify-between relative z-10 mt-4">
-              <div className="flex flex-col items-center gap-2 w-20 text-center">
-                <div className="w-14 h-14 rounded-full bg-black border border-[#F4BE02]/30 flex items-center justify-center p-2 shadow-xl">
-                  <img src="https://i.postimg.cc/tR3cPQZd/100-firula-II-removebg-preview.png" className="w-full h-full rounded-full opacity-80" />
-                </div>
-                <p className="text-[10px] font-bold uppercase tracking-tight truncate w-full">100 Firula</p>
-              </div>
+                        <div className="flex items-center justify-between relative z-10 mt-4">
+                        <div className="flex flex-col items-center gap-2 w-20 text-center">
+                            <div className="w-14 h-14 rounded-full bg-black border border-[#F4BE02]/30 flex items-center justify-center p-2 shadow-xl">
+                            <img src="https://i.postimg.cc/tR3cPQZd/100-firula-II-removebg-preview.png" className="w-full h-full rounded-full opacity-80" />
+                            </div>
+                            <p className="text-[10px] font-bold uppercase tracking-tight truncate w-full">100 Firula</p>
+                        </div>
 
-              <div className="flex flex-col items-center">
-                <div className="flex items-center gap-4">
-                  <span className="text-4xl font-display font-bold text-white">{lastScore.home}</span>
-                  <div className="h-6 w-[1px] bg-white/10"></div>
-                  <span className="text-4xl font-display font-bold text-white/40">{lastScore.away}</span>
-                </div>
-                <div className="mt-2 px-3 py-1 rounded-full bg-[#F4BE02]/10 border border-[#F4BE02]/20">
-                   <span className="text-[9px] font-black text-[#F4BE02] uppercase tracking-widest">{lastMatch.opponent}</span>
-                </div>
-              </div>
+                        <div className="flex flex-col items-center">
+                            <div className="flex items-center gap-4">
+                            <span className="text-4xl font-display font-bold text-white">{score.home}</span>
+                            <div className="h-6 w-[1px] bg-white/10"></div>
+                            <span className="text-4xl font-display font-bold text-white/40">{score.away}</span>
+                            </div>
+                            <div className="mt-2 px-3 py-1 rounded-full bg-[#F4BE02]/10 border border-[#F4BE02]/20">
+                            <span className="text-[9px] font-black text-[#F4BE02] uppercase tracking-widest">{match.opponent}</span>
+                            </div>
+                        </div>
 
-              <div className="flex flex-col items-center gap-2 w-20 text-center">
-                <div className="w-14 h-14 rounded-full bg-[#111] border border-white/10 flex items-center justify-center shadow-xl">
-                   <Trophy size={20} className="text-white/10" />
-                </div>
-                <p className="text-[10px] font-bold uppercase tracking-tight truncate w-full opacity-40">Oponente</p>
-              </div>
-            </div>
+                        <div className="flex flex-col items-center gap-2 w-20 text-center">
+                            <div className="w-14 h-14 rounded-full bg-[#111] border border-white/10 flex items-center justify-center shadow-xl overflow-hidden p-1">
+                                {match.opponentLogo ? (
+                                    <img src={match.opponentLogo} className="w-full h-full object-contain" />
+                                ) : (
+                                    <Trophy size={20} className="text-white/10" />
+                                )}
+                            </div>
+                            <p className="text-[10px] font-bold uppercase tracking-tight truncate w-full opacity-40">Oponente</p>
+                        </div>
+                        </div>
+                    </div>
+                 )
+             })}
           </div>
         </section>
       )}

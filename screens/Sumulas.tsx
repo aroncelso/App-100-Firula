@@ -6,7 +6,7 @@ import {
   Trophy, Star, Crown, Users, Check, Square, ShieldAlert,
   Zap, Target, AlertTriangle, UserCheck,
   Ban, MinusCircle, AlertCircle, UserCog, Filter, ChevronDown, Flag,
-  LayoutGrid, Image as ImageIcon, Search
+  LayoutGrid, Image as ImageIcon, Search, Share2
 } from 'lucide-react';
 
 interface Props {
@@ -230,6 +230,66 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
       }
     });
     return players.find(p => p.id === mvpId)?.name || null;
+  };
+
+  const handleShareMatchDay = (dayMatches: Match[]) => {
+      if (dayMatches.length === 0) return;
+      
+      const mainMatch = dayMatches[0];
+      const dateStr = mainMatch.date ? new Date(mainMatch.date + 'T00:00:00').toLocaleDateString('pt-BR') : '';
+      
+      let text = `*RESUMO DA RODADA - 100 FIRULA*\n`;
+      text += `📅 *${dateStr}* | 🆚 *${mainMatch.opponent}*\n\n`;
+
+      // Ordena por Label (Quadro 1, Quadro 2)
+      const sortedMatches = [...dayMatches].sort((a, b) => a.label.localeCompare(b.label));
+
+      sortedMatches.forEach((match, index) => {
+          const score = calculateScore(match);
+          const mvp = getMVP(match);
+          
+          const allEvents = [...match.stats.tempo1.events, ...match.stats.tempo2.events];
+          
+          const getPlayerNamesByEvent = (type: EventType) => {
+              const counts: Record<string, number> = {};
+              allEvents.filter(e => e.type === type).forEach(e => {
+                  counts[e.playerId] = (counts[e.playerId] || 0) + 1;
+              });
+              
+              return Object.entries(counts)
+                  .map(([pid, count]) => {
+                      const p = players.find(p => p.id === pid);
+                      return count > 1 ? `${p?.name} (${count})` : p?.name;
+                  })
+                  .filter(Boolean)
+                  .join(', ');
+          };
+
+          const goalsList = getPlayerNamesByEvent('GOL');
+          const assistsList = getPlayerNamesByEvent('ASSIST');
+          const yellowList = getPlayerNamesByEvent('AMARELO');
+          const redList = getPlayerNamesByEvent('VERMELHO');
+
+          text += `🏆 *${match.label.toUpperCase()}*\n`;
+          text += `⚔️ 100 Firula ${score.us} x ${score.them} ${match.opponent}\n`;
+          
+          if (goalsList) text += `⚽ *Gols:* ${goalsList}\n`;
+          if (assistsList) text += `👟 *Assis:* ${assistsList}\n`;
+          if (yellowList) text += `🟨 *CA:* ${yellowList}\n`;
+          if (redList) text += `🟥 *CV:* ${redList}\n`;
+          
+          if (mvp) text += `👑 *Craque:* ${mvp}\n`;
+          if (match.coach) text += `👨‍💼 *Técnico:* ${match.coach}\n`;
+          
+          if (match.notes) text += `📝 ${match.notes}\n`;
+
+          if (index < sortedMatches.length - 1) {
+              text += `\n━━━━━━━━━━━━━━━━━━\n\n`;
+          }
+      });
+
+      const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+      window.open(url, '_blank');
   };
 
   const getEventIcon = (type: EventType) => {
@@ -573,16 +633,20 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
                     <button onClick={() => { setActiveStep('info'); setShowRosterModal(true); }} className="mt-4 px-4 py-2 bg-white/10 rounded-xl text-[9px] font-bold uppercase hover:bg-white/20">Convocar Agora</button>
                   </div>
                 ) : (
-                  currentMatch.roster?.map(pid => {
-                    const player = players.find(p => p.id === pid);
-                    
-                    const t1Events = currentMatch.stats!.tempo1.events.filter(e => e.playerId === pid);
-                    const t2Events = currentMatch.stats!.tempo2.events.filter(e => e.playerId === pid);
+                  currentMatch.roster
+                    ?.map(pid => players.find(p => p.id === pid)) // Map to objects
+                    .filter((p): p is Player => !!p) // Safety filter
+                    .sort((a, b) => (a.name || '').localeCompare(b.name || '')) // Sort Alphabetically
+                    .map(player => {
+                        const pid = player.id;
+                        
+                        const t1Events = currentMatch.stats!.tempo1.events.filter(e => e.playerId === pid);
+                        const t2Events = currentMatch.stats!.tempo2.events.filter(e => e.playerId === pid);
 
-                    const pEventsAccumulated = [
-                      ...t1Events.filter(e => e.type !== 'FALTA' || currentTempo === 1),
-                      ...t2Events.filter(e => e.type !== 'FALTA' || currentTempo === 2)
-                    ];
+                        const pEventsAccumulated = [
+                          ...t1Events.filter(e => e.type !== 'FALTA' || currentTempo === 1),
+                          ...t2Events.filter(e => e.type !== 'FALTA' || currentTempo === 2)
+                        ];
                     
                     return (
                       <div key={pid} className="bg-[#0A0A0A] p-6 rounded-[28px] border border-white/[0.05] space-y-5">
@@ -695,12 +759,20 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
                   <div className="bg-[#0A0A0A] rounded-[32px] border border-white/[0.06] overflow-hidden p-2 space-y-2">
                      <div className="px-4 py-2 flex items-center justify-between">
                          <h3 className="text-sm font-display font-bold uppercase tracking-tight text-white/80">vs {opponent}</h3>
-                         <button 
-                            onClick={() => handleEditMatchGroup(dayMatches[0])} 
-                            className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-white/10"
-                         >
-                            <Pencil size={14}/>
-                         </button>
+                         <div className="flex items-center gap-2">
+                            <button 
+                                onClick={() => handleShareMatchDay(dayMatches)} 
+                                className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-green-500 hover:bg-green-500/10 transition-colors"
+                            >
+                                <Share2 size={14}/>
+                            </button>
+                            <button 
+                                onClick={() => handleEditMatchGroup(dayMatches[0])} 
+                                className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-white/10"
+                            >
+                                <Pencil size={14}/>
+                            </button>
+                         </div>
                      </div>
                      
                      {/* Lista os Jogos do Dia */}
@@ -724,7 +796,7 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
                                         <span className="text-xl font-display font-bold text-white/40">{score.them}</span>
                                     </div>
 
-                                    <div className="flex items-center justify-end gap-3 w-24">
+                                    <div className="flex items-center justify-end gap-2 w-24">
                                         {m.opponentLogo ? (
                                             <div className="w-8 h-8 rounded-full bg-black border border-white/10 p-0.5">
                                                 <img src={m.opponentLogo} className="w-full h-full object-contain" />
