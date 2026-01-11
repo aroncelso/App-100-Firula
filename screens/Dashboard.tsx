@@ -21,7 +21,12 @@ const Dashboard: React.FC<Props> = ({ players, matches }) => {
   const availableYears = useMemo(() => {
     const years = new Set<string>();
     matches.forEach(m => {
-      if (m.date) years.add(m.date.split('-')[0]);
+      if (m.date) {
+        const dateStr = String(m.date);
+        if (dateStr.includes('-')) {
+          years.add(dateStr.split('-')[0]);
+        }
+      }
     });
     years.add(currentYear);
     return Array.from(years).sort().reverse();
@@ -30,7 +35,8 @@ const Dashboard: React.FC<Props> = ({ players, matches }) => {
   // --- FILTERING LOGIC ---
   const filteredMatches = useMemo(() => {
     return matches.filter(m => {
-      const matchYear = m.date ? m.date.split('-')[0] : '';
+      const dateStr = m.date ? String(m.date) : '';
+      const matchYear = dateStr.includes('-') ? dateStr.split('-')[0] : '';
       const yearMatch = selectedYears.length === 0 || selectedYears.includes(matchYear);
       const quadroMatch = selectedQuadros.length === 0 || selectedQuadros.includes(m.label);
       return yearMatch && quadroMatch;
@@ -252,7 +258,7 @@ const Dashboard: React.FC<Props> = ({ players, matches }) => {
           <div className="bg-[#0A0A0A] rounded-[24px] border border-white/[0.06] p-6 relative overflow-hidden">
              <div className="absolute top-4 left-0 right-0 flex justify-center">
                  <div className="bg-white/5 border border-white/10 px-3 py-1 rounded-full backdrop-blur-md">
-                     <span className="text-[9px] font-black text-white/60 uppercase tracking-widest">{lastMatch.label} - {lastMatch.date?.split('-')[0]}</span>
+                     <span className="text-[9px] font-black text-white/60 uppercase tracking-widest">{lastMatch.label} - {String(lastMatch.date).split('-')[0]}</span>
                  </div>
              </div>
 

@@ -1,3 +1,4 @@
+
 import React, { useMemo, useState } from 'react';
 import { Match, Player, EventType, ScoringRule } from '../types';
 import { Trophy, Calendar, Crown, Medal, UserCog, Info, Star, Target, Zap, Shield, ShieldAlert, Square, Ban, Footprints, Flame, AlertCircle, ToggleLeft, ToggleRight, Edit3 } from 'lucide-react';
@@ -17,7 +18,12 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
   const availableYears = useMemo(() => {
     const years = new Set<string>();
     matches.forEach(m => {
-        if (m.date) years.add(m.date.split('-')[0]);
+        if (m.date) {
+          const dateStr = String(m.date);
+          if (dateStr.includes('-')) {
+            years.add(dateStr.split('-')[0]);
+          }
+        }
     });
     years.add(currentYear);
     return Array.from(years).sort().reverse();
@@ -34,7 +40,7 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
       let matchesCount = 0;
 
       matches.forEach(match => {
-          if (!match.date || match.date.split('-')[0] !== selectedYear || match.isFriendly) return;
+          if (!match.date || String(match.date).split('-')[0] !== selectedYear || match.isFriendly) return;
           
           let matchPoints = 0;
           let played = false;

@@ -32,9 +32,9 @@ const PlayerForm: React.FC<Props> = ({ playerToEdit, onSave, onCancel }) => {
           yellowCards: 0,
           redCards: 0,
         }),
-        name: name.trim(),
+        name: name.trim().toUpperCase(),
         position,
-        whatsapp: whatsapp.trim(),
+        whatsapp: whatsapp.trim().toUpperCase(),
         active: isActive,
       };
       onSave(playerData);
@@ -87,10 +87,10 @@ const PlayerForm: React.FC<Props> = ({ playerToEdit, onSave, onCancel }) => {
             </div>
             <input 
               autoFocus={!isEditing}
-              className="w-full bg-[#0A0A0A] border border-white/[0.08] rounded-3xl p-5 pl-14 focus:border-[#F4BE02]/40 outline-none transition-all font-display text-lg font-bold placeholder:text-white/5"
+              className="w-full bg-[#0A0A0A] border border-white/[0.08] rounded-3xl p-5 pl-14 focus:border-[#F4BE02]/40 outline-none transition-all font-display text-lg font-bold placeholder:text-white/5 uppercase"
               placeholder="Nome ou Apelido"
               value={name}
-              onChange={e => setName(e.target.value)}
+              onChange={e => setName(e.target.value.toUpperCase())}
             />
           </div>
         </div>
@@ -104,10 +104,10 @@ const PlayerForm: React.FC<Props> = ({ playerToEdit, onSave, onCancel }) => {
             </div>
             <input 
               type="tel"
-              className="w-full bg-[#0A0A0A] border border-white/[0.08] rounded-3xl p-5 pl-14 focus:border-green-500/40 outline-none transition-all font-display text-lg font-bold placeholder:text-white/5"
+              className="w-full bg-[#0A0A0A] border border-white/[0.08] rounded-3xl p-5 pl-14 focus:border-green-500/40 outline-none transition-all font-display text-lg font-bold placeholder:text-white/5 uppercase"
               placeholder="(00) 00000-0000"
               value={whatsapp}
-              onChange={e => setWhatsapp(e.target.value)}
+              onChange={e => setWhatsapp(e.target.value.toUpperCase())}
             />
           </div>
         </div>

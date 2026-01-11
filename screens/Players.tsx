@@ -18,7 +18,10 @@ import {
   Activity,
   Filter,
   ArrowUpDown,
-  Calendar
+  Ban,
+  CheckCircle2,
+  MinusCircle,
+  ShieldCheck
 } from 'lucide-react';
 
 interface Props {
@@ -28,7 +31,7 @@ interface Props {
   onEditPlayer: (player: Player) => void;
 }
 
-type SortKey = 'goals' | 'assists' | 'matches' | 'yellow' | 'red' | 'rating' | 'name';
+type SortKey = 'goals' | 'assists' | 'matches' | 'yellow' | 'red' | 'fouls' | 'rating' | 'name' | 'defPen' | 'ownGoal' | 'penMissed' | 'penWon' | 'penCommitted';
 
 const Players: React.FC<Props> = ({ players, matches, onAddPlayer, onEditPlayer }) => {
   const currentYear = new Date().getFullYear().toString();
@@ -45,7 +48,12 @@ const Players: React.FC<Props> = ({ players, matches, onAddPlayer, onEditPlayer 
   const availableYears = useMemo(() => {
     const years = new Set<string>();
     matches.forEach(m => {
-      if (m.date) years.add(m.date.split('-')[0]);
+      if (m.date) {
+        const dateStr = String(m.date);
+        if (dateStr.includes('-')) {
+          years.add(dateStr.split('-')[0]);
+        }
+      }
     });
     years.add(currentYear);
     return Array.from(years).sort().reverse();
@@ -62,13 +70,20 @@ const Players: React.FC<Props> = ({ players, matches, onAddPlayer, onEditPlayer 
         matches: 0,
         yellow: 0,
         red: 0,
+        fouls: 0,
+        defPen: 0,
+        ownGoal: 0,
+        penMissed: 0,
+        penWon: 0,
+        penCommitted: 0,
         ratings: [] as number[],
       });
     });
 
     // Filtrar partidas antes de processar
     const filteredMatches = matches.filter(m => {
-      const matchYear = m.date ? m.date.split('-')[0] : '';
+      const dateStr = m.date ? String(m.date) : '';
+      const matchYear = dateStr.includes('-') ? dateStr.split('-')[0] : '';
       const yearMatch = selectedYears.includes(matchYear);
       const quadroMatch = selectedQuadros.includes(m.label);
       return yearMatch && quadroMatch;
@@ -98,6 +113,12 @@ const Players: React.FC<Props> = ({ players, matches, onAddPlayer, onEditPlayer 
           if (e.type === 'ASSIST') s.assists++;
           if (e.type === 'AMARELO') s.yellow++;
           if (e.type === 'VERMELHO') s.red++;
+          if (e.type === 'FALTA') s.fouls++;
+          if (e.type === 'DEFESA_PENALTI') s.defPen++;
+          if (e.type === 'GOL_CONTRA') s.ownGoal++;
+          if (e.type === 'PENALTI_PERDIDO') s.penMissed++;
+          if (e.type === 'PENALTI_SOFRIDO') s.penWon++;
+          if (e.type === 'PENALTI_COMETIDO') s.penCommitted++;
         }
       });
     });
@@ -122,10 +143,10 @@ const Players: React.FC<Props> = ({ players, matches, onAddPlayer, onEditPlayer 
         return nameMatch && statusMatch && (p.name && p.name.trim().length > 0);
       })
       .sort((a, b) => {
+        const sA = playerFullStats.get(a.id);
+        const sB = playerFullStats.get(b.id);
+        
         if (activeTab === 'stats') {
-          const sA = playerFullStats.get(a.id);
-          const sB = playerFullStats.get(b.id);
-          
           if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '');
           if (sortBy === 'rating') return (sB?.avgRating || 0) - (sA?.avgRating || 0);
           return (sB?.[sortBy] || 0) - (sA?.[sortBy] || 0);
@@ -225,7 +246,7 @@ const Players: React.FC<Props> = ({ players, matches, onAddPlayer, onEditPlayer 
             </div>
           </div>
 
-          {/* ORDENAÇÃO */}
+          {/* ORDENAÇÃO ATUALIZADA */}
           <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide px-1">
              <div className="flex items-center gap-1.5 mr-2 shrink-0">
                 <ArrowUpDown size={12} className="text-white/20" />
@@ -235,8 +256,14 @@ const Players: React.FC<Props> = ({ players, matches, onAddPlayer, onEditPlayer 
              <SortChip active={sortBy === 'goals'} label="Gols" onClick={() => setSortBy('goals')} />
              <SortChip active={sortBy === 'assists'} label="Assis" onClick={() => setSortBy('assists')} />
              <SortChip active={sortBy === 'matches'} label="Jogos" onClick={() => setSortBy('matches')} />
+             <SortChip active={sortBy === 'fouls'} label="Faltas" onClick={() => setSortBy('fouls')} />
              <SortChip active={sortBy === 'yellow'} label="CA" onClick={() => setSortBy('yellow')} />
              <SortChip active={sortBy === 'red'} label="CV" onClick={() => setSortBy('red')} />
+             <SortChip active={sortBy === 'ownGoal'} label="GC" onClick={() => setSortBy('ownGoal')} />
+             <SortChip active={sortBy === 'defPen'} label="Def.P" onClick={() => setSortBy('defPen')} />
+             <SortChip active={sortBy === 'penWon'} label="P.Sof" onClick={() => setSortBy('penWon')} />
+             <SortChip active={sortBy === 'penMissed'} label="P.Perd" onClick={() => setSortBy('penMissed')} />
+             <SortChip active={sortBy === 'penCommitted'} label="P.Com" onClick={() => setSortBy('penCommitted')} />
              <SortChip active={sortBy === 'name'} label="A-Z" onClick={() => setSortBy('name')} />
           </div>
         </div>
@@ -292,12 +319,19 @@ const Players: React.FC<Props> = ({ players, matches, onAddPlayer, onEditPlayer 
                    </div>
                 </div>
                 
-                <div className="grid grid-cols-5 divide-x divide-white/[0.03] bg-white/[0.01]">
+                {/* LINHA ÚNICA COM ROLAGEM HORIZONTAL */}
+                <div className="flex items-center overflow-x-auto scrollbar-hide bg-white/[0.01] divide-x divide-white/[0.03]">
                    <StatItem active={sortBy === 'matches'} icon={<Activity size={10} />} value={stats.matches} label="Jogos" />
                    <StatItem active={sortBy === 'goals'} icon={<Trophy size={10} className="text-[#F4BE02]" />} value={stats.goals} label="Gols" color="text-[#F4BE02]" />
                    <StatItem active={sortBy === 'assists'} icon={<Zap size={10} className="text-blue-400" />} value={stats.assists} label="Assis" color="text-blue-400" />
+                   <StatItem active={sortBy === 'fouls'} icon={<ShieldAlert size={10} className="text-orange-400" />} value={stats.fouls} label="Faltas" />
                    <StatItem active={sortBy === 'yellow'} icon={<Square size={10} className="text-yellow-500" fill="currentColor" />} value={stats.yellow} label="CA" />
                    <StatItem active={sortBy === 'red'} icon={<Square size={10} className="text-red-600" fill="currentColor" />} value={stats.red} label="CV" />
+                   <StatItem active={sortBy === 'ownGoal'} icon={<ShieldAlert size={10} className="text-red-500" />} value={stats.ownGoal} label="GC" />
+                   <StatItem active={sortBy === 'defPen'} icon={<ShieldCheck size={10} className="text-green-500" />} value={stats.defPen} label="Def.P" />
+                   <StatItem active={sortBy === 'penWon'} icon={<CheckCircle2 size={10} className="text-green-400" />} value={stats.penWon} label="P.Sof" />
+                   <StatItem active={sortBy === 'penMissed'} icon={<Ban size={10} className="text-white/20" />} value={stats.penMissed} label="P.Perd" />
+                   <StatItem active={sortBy === 'penCommitted'} icon={<MinusCircle size={10} className="text-red-500" />} value={stats.penCommitted} label="P.Com" />
                 </div>
               </div>
             );
@@ -371,7 +405,7 @@ const SortChip = ({ active, label, onClick }: any) => (
 );
 
 const StatItem = ({ icon, value, label, color = "text-white/80", active }: any) => (
-  <div className={`flex flex-col items-center py-3 px-1 transition-colors ${active ? 'bg-white/[0.04]' : ''}`}>
+  <div className={`flex flex-col items-center py-3 px-4 transition-colors shrink-0 min-w-[70px] ${active ? 'bg-white/[0.04]' : ''}`}>
     <div className="flex items-center gap-1 mb-1">
       {icon}
       <span className={`text-sm font-display font-bold ${color}`}>{value}</span>

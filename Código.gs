@@ -1,20 +1,25 @@
 
 /**
- * 100 FIRULA SOCIETY - DATABASE ENGINE v6.0
- * Organização automática em abas sem nenhuma formatação.
+ * 100 FIRULA SOCIETY - DATABASE ENGINE v7.0
+ * Organização total em colunas individuais (Sem JSON).
  */
 
 const CONFIG = {
   'JOGADORES': ['ID', 'NOME', 'POSICAO', 'GOLS', 'ASSISTENCIAS', 'JOGOS', 'AMARELOS', 'VERMELHOS', 'WHATSAPP', 'ATIVO'],
-  'SÚMULAS': ['ID', 'DATA', 'ADVERSARIO', 'QUADRO', 'TECNICO', 'AMISTOSO', 'WO', 'NOTAS', 'ESTATISTICAS_JSON', 'ELENCO_JSON', 'AVALIACOES_JSON'],
+  'PARTIDAS': [
+    'ID', 'DATA', 'ADVERSARIO', 'QUADRO', 'TECNICO', 'AMISTOSO', 'WO', 'NOTAS', 
+    'GOLS_PRO', 'GOLS_CONTRA', 'FALTAS_TIME_T1', 'FALTAS_TIME_T2', 
+    'GOLS_ADVERSARIO_T1', 'GOLS_ADVERSARIO_T2', 'FALTAS_ADVERSARIO_T1', 'FALTAS_ADVERSARIO_T2'
+  ],
+  'LANCAMENTOS_ATLETAS': [
+    'ID_PARTIDA', 'ID_ATLETA', 'GOLS', 'ASSISTENCIAS', 'AMARELO', 'VERMELHO', 
+    'FALTAS', 'GOL_CONTRA', 'PENALTI_SOFRIDO', 'PENALTI_COMETIDO', 'PENALTI_PERDIDO', 'NOTA'
+  ],
   'DESPESAS': ['ID', 'DATA', 'DESCRICAO', 'VALOR', 'CATEGORIA'],
   'MENSALIDADES': ['PLAYER_ID', 'MES', 'STATUS', 'VALOR'],
   'REGRAS_CARTOLA': ['ID', 'LABEL', 'CATEGORIA', 'VALOR', 'ATIVO', 'TIPO']
 };
 
-/**
- * Cria ou recupera uma aba sem nenhuma cor ou estilo.
- */
 function getOrCreateSheet(name) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(name);
@@ -33,14 +38,11 @@ function getOrCreateSheet(name) {
 function doGet() {
   const result = {
     PLAYERS: [],
-    MATCHES: [],
+    PARTIDAS: [],
+    LANCAMENTOS_ATLETAS: [],
     EXPENSES: [],
     PAYMENTS: [],
     RULES: []
-  };
-
-  const parseJSON = (val) => {
-    try { return val ? JSON.parse(val) : null; } catch (e) { return null; }
   };
 
   // 1. JOGADORES
@@ -55,21 +57,38 @@ function doGet() {
     });
   });
 
-  // 2. SÚMULAS
-  const sheetMatches = getOrCreateSheet('SÚMULAS');
+  // 2. PARTIDAS
+  const sheetMatches = getOrCreateSheet('PARTIDAS');
   const dataMatches = sheetMatches.getDataRange().getValues().slice(1);
   dataMatches.forEach(row => {
     if (!row[0]) return;
-    result.MATCHES.push({
+    result.PARTIDAS.push({
       id: row[0].toString(), 
-      date: row[1] instanceof Date ? row[1].toISOString().split('T')[0] : row[1],
-      opponent: row[2], label: row[3], coach: row[4], isFriendly: row[5] === true,
-      wo: row[6], notes: row[7], stats: parseJSON(row[8]), roster: parseJSON(row[9]),
-      playerRatings: parseJSON(row[10])
+      data: row[1] instanceof Date ? row[1].toISOString().split('T')[0] : row[1],
+      adversario: row[2], quadro: row[3], tecnico: row[4], amistoso: row[5],
+      wo: row[6], notas: row[7], golsPro: row[8], golsContra: row[9],
+      faltasTimeT1: row[10], faltasTimeT2: row[11],
+      golsAdversarioT1: row[12], golsAdversarioT2: row[13],
+      faltasAdversarioT1: row[14], faltasAdversarioT2: row[15]
     });
   });
 
-  // 3. DESPESAS
+  // 3. LANCAMENTOS_ATLETAS
+  const sheetL = getOrCreateSheet('LANCAMENTOS_ATLETAS');
+  const dataL = sheetL.getDataRange().getValues().slice(1);
+  dataL.forEach(row => {
+    if (!row[0]) return;
+    result.LANCAMENTOS_ATLETAS.push({
+      idPartida: row[0].toString(), idAtleta: row[1].toString(), 
+      gols: Number(row[2]) || 0, assists: Number(row[3]) || 0,
+      amarelo: Number(row[4]) || 0, vermelho: Number(row[5]) || 0,
+      faltas: Number(row[6]) || 0, golContra: Number(row[7]) || 0,
+      pSofri: Number(row[8]) || 0, pCometi: Number(row[9]) || 0,
+      pPerd: Number(row[10]) || 0, nota: Number(row[11]) || 0
+    });
+  });
+
+  // 4. DESPESAS
   const sheetExpenses = getOrCreateSheet('DESPESAS');
   const dataExpenses = sheetExpenses.getDataRange().getValues().slice(1);
   dataExpenses.forEach(row => {
@@ -80,7 +99,7 @@ function doGet() {
     });
   });
 
-  // 4. MENSALIDADES
+  // 5. MENSALIDADES
   const sheetPayments = getOrCreateSheet('MENSALIDADES');
   const dataPayments = sheetPayments.getDataRange().getValues().slice(1);
   dataPayments.forEach(row => {
@@ -90,7 +109,7 @@ function doGet() {
     });
   });
 
-  // 5. REGRAS
+  // 6. REGRAS
   const sheetRules = getOrCreateSheet('REGRAS_CARTOLA');
   const dataRules = sheetRules.getDataRange().getValues().slice(1);
   dataRules.forEach(row => {
@@ -114,72 +133,51 @@ function doPost(e) {
     
     if (!allData) throw new Error('Dados ausentes.');
 
-    // Atualização JOGADORES
-    const sheetP = getOrCreateSheet('JOGADORES');
-    const headersP = CONFIG['JOGADORES'];
-    if (sheetP.getLastRow() > 1) {
-      sheetP.getRange(2, 1, sheetP.getLastRow() - 1, headersP.length).clearContent();
-    }
-    if (allData.PLAYERS && allData.PLAYERS.length > 0) {
-      const rowsP = allData.PLAYERS.map(p => [
-        p.id, p.name, p.position, p.goals, p.assists, p.matchesPlayed, 
-        p.yellowCards, p.redCards, p.whatsapp, p.active === false ? 'Não' : 'Sim'
-      ]);
-      sheetP.getRange(2, 1, rowsP.length, headersP.length).setValues(rowsP);
-    }
+    // Função auxiliar para limpar e escrever
+    const syncSheet = (name, dataRows) => {
+      const sheet = getOrCreateSheet(name);
+      const headers = CONFIG[name];
+      if (sheet.getLastRow() > 1) {
+        sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).clearContent();
+      }
+      if (dataRows && dataRows.length > 0) {
+        sheet.getRange(2, 1, dataRows.length, headers.length).setValues(dataRows);
+      }
+    };
 
-    // Atualização SÚMULAS
-    const sheetM = getOrCreateSheet('SÚMULAS');
-    const headersM = CONFIG['SÚMULAS'];
-    if (sheetM.getLastRow() > 1) {
-      sheetM.getRange(2, 1, sheetM.getLastRow() - 1, headersM.length).clearContent();
-    }
-    if (allData.MATCHES && allData.MATCHES.length > 0) {
-      const rowsM = allData.MATCHES.map(m => [
-        m.id, m.date, m.opponent, m.label, m.coach, m.isFriendly, m.wo, m.notes,
-        JSON.stringify(m.stats), JSON.stringify(m.roster), JSON.stringify(m.playerRatings)
-      ]);
-      sheetM.getRange(2, 1, rowsM.length, headersM.length).setValues(rowsM);
-    }
+    // 1. JOGADORES
+    syncSheet('JOGADORES', allData.PLAYERS.map(p => [
+      p.id, p.name, p.position, p.goals, p.assists, p.matchesPlayed, 
+      p.yellowCards, p.redCards, p.whatsapp, p.active === false ? 'Não' : 'Sim'
+    ]));
 
-    // Atualização DESPESAS
-    const sheetE = getOrCreateSheet('DESPESAS');
-    const headersE = CONFIG['DESPESAS'];
-    if (sheetE.getLastRow() > 1) {
-      sheetE.getRange(2, 1, sheetE.getLastRow() - 1, headersE.length).clearContent();
-    }
-    if (allData.EXPENSES && allData.EXPENSES.length > 0) {
-      const rowsE = allData.EXPENSES.map(ex => [
-        ex.id, ex.date, ex.description, ex.value, ex.category
-      ]);
-      sheetE.getRange(2, 1, rowsE.length, headersE.length).setValues(rowsE);
-    }
+    // 2. PARTIDAS
+    syncSheet('PARTIDAS', allData.PARTIDAS.map(m => [
+      m.id, m.data, m.adversario, m.quadro, m.tecnico, m.amistoso, m.wo, m.notas,
+      m.golsPro, m.golsContra, m.faltasTimeT1, m.faltasTimeT2,
+      m.golsAdversarioT1, m.golsAdversarioT2, m.faltasAdversarioT1, m.faltasAdversarioT2
+    ]));
 
-    // Atualização MENSALIDADES
-    const sheetPay = getOrCreateSheet('MENSALIDADES');
-    const headersPay = CONFIG['MENSALIDADES'];
-    if (sheetPay.getLastRow() > 1) {
-      sheetPay.getRange(2, 1, sheetPay.getLastRow() - 1, headersPay.length).clearContent();
-    }
-    if (allData.PAYMENTS && allData.PAYMENTS.length > 0) {
-      const rowsPay = allData.PAYMENTS.map(py => [
-        py.playerId, py.month, py.status, py.value
-      ]);
-      sheetPay.getRange(2, 1, rowsPay.length, headersPay.length).setValues(rowsPay);
-    }
+    // 3. LANCAMENTOS_ATLETAS
+    syncSheet('LANCAMENTOS_ATLETAS', allData.LANCAMENTOS_ATLETAS.map(l => [
+      l.idPartida, l.idAtleta, l.gols, l.assists, l.amarelo, l.vermelho,
+      l.faltas, l.golContra, l.pSofri, l.pCometi, l.pPerd, l.nota
+    ]));
 
-    // Atualização REGRAS
-    const sheetR = getOrCreateSheet('REGRAS_CARTOLA');
-    const headersR = CONFIG['REGRAS_CARTOLA'];
-    if (sheetR.getLastRow() > 1) {
-      sheetR.getRange(2, 1, sheetR.getLastRow() - 1, headersR.length).clearContent();
-    }
-    if (allData.RULES && allData.RULES.length > 0) {
-      const rowsR = allData.RULES.map(r => [
-        r.id, r.label, r.category, r.value, r.active ? 'Sim' : 'Não', r.type
-      ]);
-      sheetR.getRange(2, 1, rowsR.length, headersR.length).setValues(rowsR);
-    }
+    // 4. DESPESAS
+    syncSheet('DESPESAS', allData.EXPENSES.map(ex => [
+      ex.id, ex.date, ex.description, ex.value, ex.category
+    ]));
+
+    // 5. MENSALIDADES
+    syncSheet('MENSALIDADES', allData.PAYMENTS.map(py => [
+      py.playerId, py.month, py.status, py.value
+    ]));
+
+    // 6. REGRAS
+    syncSheet('REGRAS_CARTOLA', allData.RULES.map(r => [
+      r.id, r.label, r.category, r.value, r.active ? 'Sim' : 'Não', r.type
+    ]));
 
     SpreadsheetApp.flush();
     return ContentService.createTextOutput(JSON.stringify({ status: 'success' })).setMimeType(ContentService.MimeType.JSON);

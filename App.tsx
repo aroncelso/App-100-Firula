@@ -99,7 +99,7 @@ const App: React.FC = () => {
     init();
   }, []);
 
-  // Motor de Sincronização Automática
+  // Motor de Sincronização Automática (Debounced para evitar spam, mas ágil o suficiente)
   useEffect(() => {
     if (!dataLoaded.current) return;
 
@@ -117,7 +117,7 @@ const App: React.FC = () => {
         setLastSyncTime(new Date());
       }
       setTimeout(() => setIsSyncing(false), 800);
-    }, 2000);
+    }, 1000); // Reduzido para 1 segundo para maior percepção de "tempo real"
 
     return () => clearTimeout(timer);
   }, [players, matches, expenses, payments, scoringRules]);
