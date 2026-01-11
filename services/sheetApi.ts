@@ -1,7 +1,7 @@
 
 import { Player, Match, Expense, Payment, ScoringRule, MatchEvent, HalfStats, RatingDetail } from '../types';
 
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby3Hcx-lQ40h9Vf09Xf77lNLYDAVpuh9QEE1T6-85phgDc-4I5ztG-iX-qwsZbbwmzBwg/exec';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby8at7NwrXbJs6qiyL1Zv6UhVv0P_KMLDdLh0qhY0-_piKfxxxW1cw1g468--WMzRlS9A/exec';
 
 const ensureISO = (val: any): string => {
   if (!val) return '';
@@ -141,10 +141,18 @@ export const api = {
             assists: Number(p.assistencias) || 0, 
             matchesPlayed: Number(p.jogos) || 0, 
             active: p.active !== 'Não',
-            whatsapp: p.whatsapp ? String(p.whatsapp) : undefined 
+            whatsapp: p.whatsapp ? String(p.whatsapp) : undefined,
+            paymentType: p.tipo === 'Avulso' ? 'Avulso' : 'Mensalista'
           })),
           MATCHES: matches,
-          EXPENSES: (data.EXPENSES || []).map((ex: any) => ({ id: ex.id.toString(), description: ex.description || ex.descricao || '', value: Number(ex.value || ex.valor) || 0, date: ensureISO(ex.date || ex.data), category: ex.category || ex.categoria || 'Variável' })),
+          EXPENSES: (data.EXPENSES || []).map((ex: any) => ({ 
+            id: ex.id.toString(), 
+            description: ex.description || ex.descricao || '', 
+            value: Number(ex.value || ex.valor) || 0, 
+            date: ensureISO(ex.date || ex.data), 
+            category: ex.category || ex.categoria || 'Variável',
+            type: ex.tipo || 'expense' // Mapeia o tipo (income/expense)
+          })),
           
           PAYMENTS: (data.PAYMENTS || []).map((py: any) => {
             const rawStatus = py.status || '';
@@ -231,7 +239,11 @@ export const api = {
       const payload = {
         type: 'SYNC_ALL_CHANNELS',
         data: {
-          PLAYERS: allData.PLAYERS.map(p => ({ ...p, active: p.active === false ? 'Não' : 'Sim' })),
+          PLAYERS: allData.PLAYERS.map(p => ({ 
+             ...p, 
+             active: p.active === false ? 'Não' : 'Sim',
+             tipo: p.paymentType || 'Mensalista'
+          })),
           PARTIDAS: allData.MATCHES.map(m => ({
             id: m.id, 
             data: toBRDate(m.date), 
@@ -248,7 +260,15 @@ export const api = {
             faltasTimeT1: m.stats.tempo1.fouls || 0, faltasTimeT2: m.stats.tempo2.fouls || 0, golsAdversarioT1: m.stats.tempo1.opponentGoals || 0, golsAdversarioT2: m.stats.tempo2.opponentGoals || 0, faltasAdversarioT1: m.stats.tempo1.opponentFouls || 0, faltasAdversarioT2: m.stats.tempo2.opponentFouls || 0
           })),
           LANCAMENTOS_ATLETAS: lancamentos,
-          EXPENSES: allData.EXPENSES.map(ex => ({ id: ex.id, date: toBRDate(ex.date), description: ex.description, value: ex.value, category: ex.category })),
+          // Atualiza EXPENSES para enviar type
+          EXPENSES: allData.EXPENSES.map(ex => ({ 
+             id: ex.id, 
+             date: toBRDate(ex.date), 
+             description: ex.description, 
+             value: ex.value, 
+             category: ex.category,
+             type: ex.type || 'expense'
+          })),
           PAYMENTS: pagamentosEnriquecidos,
           RULES: allData.RULES
         }

@@ -6,12 +6,13 @@ import {
   Trophy, Star, Crown, Users, Check, Square, ShieldAlert,
   Zap, Target, AlertTriangle, UserCheck,
   Ban, MinusCircle, AlertCircle, UserCog, Filter, ChevronDown, Flag,
-  LayoutGrid, Image as ImageIcon, Search, Share2, ClipboardList
+  LayoutGrid, Image as ImageIcon, Search, Share2, ClipboardList, UserPlus
 } from 'lucide-react';
 
 interface Props {
   matches: Match[];
   players: Player[];
+  setPlayers: React.Dispatch<React.SetStateAction<Player[]>>;
   setMatches: React.Dispatch<React.SetStateAction<Match[]>>;
 }
 
@@ -19,10 +20,15 @@ type QuadroType = 'Quadro 1' | 'Quadro 2';
 
 const HOME_TEAM_LOGO = "https://i.postimg.cc/tR3cPQZd/100-firula-II-removebg-preview.png";
 
-const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
+const Sumulas: React.FC<Props> = ({ matches, players, setPlayers, setMatches }) => {
   const currentYear = new Date().getFullYear().toString();
   const [showForm, setShowForm] = useState(false);
   const [showRosterModal, setShowRosterModal] = useState(false);
+  
+  // States para Adicionar Convidado
+  const [isAddingGuest, setIsAddingGuest] = useState(false);
+  const [guestName, setGuestName] = useState('');
+  const [guestPosition, setGuestPosition] = useState<Player['position']>('Atacante');
   
   // Rating State
   const [ratingMatchId, setRatingMatchId] = useState<string | null>(null);
@@ -448,6 +454,32 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
       const details = m.detailedRatings[targetPlayerId] || [];
       const myRating = details.find(r => r.evaluatorId === currentEvaluatorId);
       return myRating ? myRating.score : 0;
+  };
+  
+  // --- ADICIONAR CONVIDADO ---
+  const handleAddGuest = () => {
+      if (!guestName.trim()) return;
+      if (!currentMatch) return;
+
+      const newId = Date.now().toString();
+      const newPlayer: Player = {
+          id: newId,
+          name: guestName.toUpperCase().trim() + ' (C)',
+          position: guestPosition,
+          active: true,
+          goals: 0, assists: 0, matchesPlayed: 0, yellowCards: 0, redCards: 0
+      };
+
+      // Adiciona ao estado global
+      setPlayers(prev => [...prev, newPlayer]);
+
+      // Adiciona ao elenco da partida atual
+      const currentRoster = currentMatch.roster || [];
+      updateMatchInGlobal({ ...currentMatch, roster: [...currentRoster, newId] });
+
+      // Reset
+      setGuestName('');
+      setIsAddingGuest(false);
   };
 
   // --- RENDER ---
@@ -993,6 +1025,51 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
               </div>
               
               <div className="flex-1 overflow-y-auto p-6 space-y-3">
+                {/* BOTÃO ADICIONAR CONVIDADO RÁPIDO */}
+                <div className="mb-4 space-y-3">
+                    {!isAddingGuest ? (
+                        <button 
+                            onClick={() => setIsAddingGuest(true)}
+                            className="w-full p-4 rounded-3xl border border-dashed border-white/20 bg-white/[0.02] flex items-center justify-center gap-3 text-white/40 hover:text-[#F4BE02] hover:border-[#F4BE02] transition-all"
+                        >
+                            <UserPlus size={18} />
+                            <span className="text-xs font-black uppercase tracking-widest">Adicionar Convidado</span>
+                        </button>
+                    ) : (
+                        <div className="p-5 rounded-3xl bg-[#111] border border-white/10 space-y-3 animate-in fade-in slide-in-from-top-2">
+                             <div className="flex justify-between items-center mb-1">
+                                <span className="text-[9px] font-black uppercase text-[#F4BE02]">Novo Convidado</span>
+                                <button onClick={() => setIsAddingGuest(false)}><X size={14} className="text-white/40" /></button>
+                             </div>
+                             <input 
+                                autoFocus
+                                type="text"
+                                placeholder="NOME DO CONVIDADO"
+                                className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs font-bold uppercase outline-none focus:border-[#F4BE02]"
+                                value={guestName}
+                                onChange={e => setGuestName(e.target.value)}
+                             />
+                             <div className="flex gap-2">
+                                {['Atacante', 'Meio-Campo', 'Zagueiro', 'Goleiro'].map(pos => (
+                                    <button 
+                                        key={pos}
+                                        onClick={() => setGuestPosition(pos as any)}
+                                        className={`flex-1 py-2 rounded-lg text-[8px] font-black uppercase border transition-all ${guestPosition === pos ? 'bg-[#F4BE02] text-black border-[#F4BE02]' : 'bg-white/5 text-white/30 border-white/5'}`}
+                                    >
+                                        {pos.substring(0, 3)}
+                                    </button>
+                                ))}
+                             </div>
+                             <button 
+                                onClick={handleAddGuest}
+                                className="w-full py-3 bg-[#F4BE02] text-black rounded-xl text-[10px] font-black uppercase tracking-widest"
+                             >
+                                Confirmar e Selecionar
+                             </button>
+                        </div>
+                    )}
+                </div>
+
                 <button 
                   onClick={toggleSelectAll}
                   className="w-full p-4 rounded-3xl border border-white/10 bg-white/5 flex items-center justify-between transition-all active:scale-[0.98]"
@@ -1010,6 +1087,7 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
                 {activePlayers.map(p => {
                   const isSelected = currentMatch.roster?.includes(p.id);
                   const isCoach = currentMatch.coach === p.name;
+                  const isGuest = p.name.includes('(C)');
 
                   return (
                     <div 

@@ -21,7 +21,8 @@ import {
   Ban,
   CheckCircle2,
   MinusCircle,
-  ShieldCheck
+  ShieldCheck,
+  Wallet
 } from 'lucide-react';
 
 interface Props {
@@ -305,6 +306,7 @@ const Players: React.FC<Props> = ({ players, matches, onAddPlayer, onEditPlayer 
           const initial = name.length > 0 ? name.charAt(0).toUpperCase() : '?';
           const isInactive = p.active === false;
           const stats = playerFullStats.get(p.id);
+          const isMensalista = p.paymentType === 'Mensalista';
 
           if (activeTab === 'stats') {
             return (
@@ -359,7 +361,13 @@ const Players: React.FC<Props> = ({ players, matches, onAddPlayer, onEditPlayer 
                     <h4 className="font-bold text-sm text-white">{name}</h4>
                     {isInactive && <span className="text-[7px] font-black uppercase tracking-widest px-1 py-0.5 rounded bg-red-500/10 text-red-500">Inativo</span>}
                   </div>
-                  <p className="text-[9px] text-white/30 font-black uppercase tracking-widest mt-0.5">{p.position}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                      <p className="text-[9px] text-white/30 font-black uppercase tracking-widest">{p.position}</p>
+                      <span className="w-0.5 h-0.5 rounded-full bg-white/20"></span>
+                      <p className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${isMensalista || !p.paymentType ? 'bg-[#F4BE02]/10 text-[#F4BE02]' : 'bg-white/10 text-white/50'}`}>
+                          {p.paymentType || 'Mensalista'}
+                      </p>
+                  </div>
                 </div>
               </div>
               

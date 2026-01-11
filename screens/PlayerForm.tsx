@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Player } from '../types';
-import { User, Check, X, Shield, Zap, Target, Loader2, MessageCircle, ToggleLeft, ToggleRight, Phone } from 'lucide-react';
+import { User, Check, X, Shield, Zap, Target, Loader2, MessageCircle, ToggleLeft, ToggleRight, Phone, Wallet } from 'lucide-react';
 
 interface Props {
   playerToEdit?: Player;
@@ -14,6 +14,7 @@ const PlayerForm: React.FC<Props> = ({ playerToEdit, onSave, onCancel }) => {
   const [position, setPosition] = useState<Player['position']>(playerToEdit?.position || 'Atacante');
   const [whatsapp, setWhatsapp] = useState(playerToEdit?.whatsapp || '');
   const [isActive, setIsActive] = useState(playerToEdit?.active !== false);
+  const [paymentType, setPaymentType] = useState<Player['paymentType']>(playerToEdit?.paymentType || 'Mensalista');
   const [loading, setLoading] = useState(false);
 
   const isEditing = !!playerToEdit;
@@ -34,8 +35,9 @@ const PlayerForm: React.FC<Props> = ({ playerToEdit, onSave, onCancel }) => {
         }),
         name: name.trim().toUpperCase(),
         position,
-        whatsapp: whatsapp.trim().toUpperCase(),
+        whatsapp: whatsapp.trim(),
         active: isActive,
+        paymentType: paymentType,
       };
       onSave(playerData);
       setLoading(false);
@@ -48,6 +50,28 @@ const PlayerForm: React.FC<Props> = ({ playerToEdit, onSave, onCancel }) => {
     { id: 'Zagueiro', label: 'Zagueiro', icon: <Shield size={18} />, color: '#2563eb' },
     { id: 'Goleiro', label: 'Goleiro', icon: <User size={18} />, color: '#16a34a' },
   ];
+
+  const formatBrazilianPhone = (value: string) => {
+    // Remove tudo que não é número
+    const numbers = value.replace(/\D/g, '');
+    
+    // Limita a 11 dígitos (DDD + 9 dígitos)
+    const limit = numbers.slice(0, 11);
+
+    // Aplica a máscara (XX) XXXXX-XXXX
+    if (limit.length > 7) {
+      return `(${limit.slice(0, 2)}) ${limit.slice(2, 7)}-${limit.slice(7)}`;
+    } else if (limit.length > 2) {
+      return `(${limit.slice(0, 2)}) ${limit.slice(2)}`;
+    } else if (limit.length > 0) {
+      return `(${limit}`;
+    }
+    return '';
+  };
+
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setWhatsapp(formatBrazilianPhone(e.target.value));
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-right-8 duration-500 pb-20">
@@ -77,6 +101,27 @@ const PlayerForm: React.FC<Props> = ({ playerToEdit, onSave, onCancel }) => {
             </button>
           </div>
         )}
+        
+        {/* Tipo de Pagamento */}
+        <div className="space-y-3">
+             <label className="text-[10px] font-black text-white/30 uppercase tracking-[0.3em] ml-2">Regime Financeiro</label>
+             <div className="flex gap-2">
+                <button 
+                    onClick={() => setPaymentType('Mensalista')}
+                    className={`flex-1 py-4 rounded-2xl border transition-all flex flex-col items-center gap-1 ${paymentType === 'Mensalista' ? 'bg-[#F4BE02] border-[#F4BE02] text-black shadow-lg' : 'bg-[#0A0A0A] border-white/10 text-white/30 hover:border-white/30'}`}
+                >
+                    <Wallet size={18} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Mensalista</span>
+                </button>
+                <button 
+                    onClick={() => setPaymentType('Avulso')}
+                    className={`flex-1 py-4 rounded-2xl border transition-all flex flex-col items-center gap-1 ${paymentType === 'Avulso' ? 'bg-white text-black border-white shadow-lg' : 'bg-[#0A0A0A] border-white/10 text-white/30 hover:border-white/30'}`}
+                >
+                    <User size={18} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Avulso</span>
+                </button>
+             </div>
+        </div>
 
         {/* Name Input */}
         <div className="space-y-3">
@@ -104,10 +149,11 @@ const PlayerForm: React.FC<Props> = ({ playerToEdit, onSave, onCancel }) => {
             </div>
             <input 
               type="tel"
+              maxLength={15}
               className="w-full bg-[#0A0A0A] border border-white/[0.08] rounded-3xl p-5 pl-14 focus:border-green-500/40 outline-none transition-all font-display text-lg font-bold placeholder:text-white/5 uppercase"
               placeholder="(00) 00000-0000"
               value={whatsapp}
-              onChange={e => setWhatsapp(e.target.value.toUpperCase())}
+              onChange={handlePhoneChange}
             />
           </div>
         </div>

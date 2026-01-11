@@ -68,10 +68,14 @@ const parseSafeDate = (dateStr: string) => {
 const Finance: React.FC<Props> = ({ payments, players, setPayments, expenses, setExpenses }) => {
   const now = new Date();
   const [activeTab, setActiveTab] = useState<'payments' | 'expenses' | 'history' | 'analysis'>('payments');
+  
+  // Forms States
   const [showExpenseForm, setShowExpenseForm] = useState(false);
+  const [showIncomeForm, setShowIncomeForm] = useState(false);
+  
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
 
-  // Estados para filtro de mensalidade
+  // Estados para filtro de mensalidade/receita
   const [selectedMonth, setSelectedMonth] = useState(MONTHS[now.getMonth()]);
   const [selectedYear, setSelectedYear] = useState(now.getFullYear().toString());
 
@@ -84,7 +88,7 @@ const Finance: React.FC<Props> = ({ payments, players, setPayments, expenses, se
   const [analysisYear, setAnalysisYear] = useState(now.getFullYear().toString());
 
   // --- LÓGICA DE FILTROS DINÂMICOS ---
-  // Calcula quais períodos (Mês/Ano) realmente possuem dados (Pagamentos Realizados ou Despesas)
+  // Calcula quais períodos (Mês/Ano) realmente possuem dados
   const validPeriods = useMemo(() => {
     const periods = new Set<string>();
     
@@ -100,7 +104,7 @@ const Finance: React.FC<Props> = ({ payments, players, setPayments, expenses, se
         if (p.status === 'Pago' && p.paymentDate) addDate(p.paymentDate);
     });
 
-    // Adiciona datas de despesas
+    // Adiciona datas de transações (despesas e receitas extras)
     expenses.forEach(e => {
         if (e.date) addDate(e.date);
     });
@@ -120,9 +124,14 @@ const Finance: React.FC<Props> = ({ payments, players, setPayments, expenses, se
     return Array.from(years).sort().reverse();
   }, [validPeriods]);
 
-  // --- LOGICA ESPECÍFICA PARA CADA ABA ---
+  // --- SEPARAÇÃO DE RECEITAS EXTRAS E DESPESAS ---
+  // "Despesas" no array `expenses` que são type='expense' ou undefined (legado)
+  const outflows = useMemo(() => expenses.filter(e => !e.type || e.type === 'expense'), [expenses]);
+  // "Receitas" no array `expenses` que são type='income'
+  const extraRevenues = useMemo(() => expenses.filter(e => e.type === 'income'), [expenses]);
 
-  // 1. ABA PAGAMENTOS (MENSAL)
+
+  // 1. ABA PAGAMENTOS (MENSAL) + RECEITAS EXTRAS
   const availablePaymentMonths = useMemo(() => {
     return validPeriods
         .filter(p => p.year === selectedYear)
@@ -176,15 +185,11 @@ const Finance: React.FC<Props> = ({ payments, players, setPayments, expenses, se
     const unpaid: { player: Player, payment?: Payment }[] = [];
 
     // 1. LISTA DE PAGOS: Baseada na DATA DO PAGAMENTO (Regime de Caixa)
-    // Mostra tudo que entrou no caixa no mês/ano selecionado, independente do mês de referência.
     const paidInPeriod = payments.filter(p => {
         if (p.status !== 'Pago') return false;
-        
-        // Verifica a Data do Pagamento
         const pDate = parseSafeDate(p.paymentDate || ''); 
         const pMonth = MONTHS[pDate.getMonth()];
         const pYear = pDate.getFullYear().toString();
-        
         return pMonth === selectedMonth && pYear === selectedYear;
     });
 
@@ -196,12 +201,8 @@ const Finance: React.FC<Props> = ({ payments, players, setPayments, expenses, se
     });
 
     // 2. LISTA DE PENDENTES: Baseada no MÊS DE REFERÊNCIA (Regime de Competência)
-    // Mostra quem ainda deve o mês selecionado no filtro.
     activePlayersList.forEach(player => {
-        // Busca se existe registro para a referência selecionada
         const paymentRef = payments.find(p => p.playerId === player.id && p.month === currentPeriod);
-        
-        // Se não existir registro OU se existir e for Pendente, entra na lista de devedores do mês
         if (!paymentRef || paymentRef.status === 'Pendente') {
             unpaid.push({ player, payment: paymentRef });
         }
@@ -213,23 +214,36 @@ const Finance: React.FC<Props> = ({ payments, players, setPayments, expenses, se
     };
   }, [activePlayersList, payments, currentPeriod, selectedMonth, selectedYear]);
 
+  // Receitas extras do mês selecionado
+  const filteredExtraRevenues = useMemo(() => {
+      return extraRevenues.filter(ex => {
+          const d = parseSafeDate(ex.date);
+          const mMatch = MONTHS[d.getMonth()] === selectedMonth;
+          const yMatch = d.getFullYear().toString() === selectedYear;
+          return mMatch && yMatch;
+      });
+  }, [extraRevenues, selectedMonth, selectedYear]);
+
   // Filtragem das despesas com base no filtro de busca
   const filteredExpenses = useMemo(() => {
-    return expenses.filter(ex => {
+    return outflows.filter(ex => {
       const d = parseSafeDate(ex.date);
       const mMatch = MONTHS[d.getMonth()] === expenseSearchMonth;
       const yMatch = d.getFullYear().toString() === expenseSearchYear;
       return mMatch && yMatch;
     });
-  }, [expenses, expenseSearchMonth, expenseSearchYear]);
+  }, [outflows, expenseSearchMonth, expenseSearchYear]);
 
   // Cálculos Gerais (Todo o histórico)
-  const totalRevenueAllTime = useMemo(() => payments.filter(p => p.status === 'Pago').reduce((acc, p) => acc + (Number(p.value) || 0), 0), [payments]);
-  const totalExpensesAllTime = useMemo(() => expenses.reduce((acc, e) => acc + (Number(e.value) || 0), 0), [expenses]);
+  const totalMonthlyFees = useMemo(() => payments.filter(p => p.status === 'Pago').reduce((acc, p) => acc + (Number(p.value) || 0), 0), [payments]);
+  const totalExtraRevenue = useMemo(() => extraRevenues.reduce((acc, e) => acc + (Number(e.value) || 0), 0), [extraRevenues]);
+  const totalRevenueAllTime = totalMonthlyFees + totalExtraRevenue;
+  
+  const totalExpensesAllTime = useMemo(() => outflows.reduce((acc, e) => acc + (Number(e.value) || 0), 0), [outflows]);
   const globalBalance = totalRevenueAllTime - totalExpensesAllTime;
 
-  // Cálculos Filtrados para Análise
-  const filteredRevenueAnalysis = useMemo(() => {
+  // Cálculos Filtrados para Análise (Mes selecionado)
+  const filteredFeesRevenueAnalysis = useMemo(() => {
     return payments
       .filter(p => {
           if (p.status !== 'Pago') return false;
@@ -239,8 +253,19 @@ const Finance: React.FC<Props> = ({ payments, players, setPayments, expenses, se
       .reduce((acc, p) => acc + (Number(p.value) || 0), 0);
   }, [payments, analysisMonth, analysisYear]);
 
+  const filteredExtraRevenueAnalysis = useMemo(() => {
+      return extraRevenues
+        .filter(ex => {
+            const d = parseSafeDate(ex.date);
+            return MONTHS[d.getMonth()] === analysisMonth && d.getFullYear().toString() === analysisYear;
+        })
+        .reduce((acc, e) => acc + (Number(e.value) || 0), 0);
+  }, [extraRevenues, analysisMonth, analysisYear]);
+
+  const filteredRevenueAnalysis = filteredFeesRevenueAnalysis + filteredExtraRevenueAnalysis;
+
   const filteredExpensesAnalysis = useMemo(() => {
-    return expenses
+    return outflows
       .filter(ex => {
         const d = parseSafeDate(ex.date);
         const mMatch = MONTHS[d.getMonth()] === analysisMonth;
@@ -248,7 +273,7 @@ const Finance: React.FC<Props> = ({ payments, players, setPayments, expenses, se
         return mMatch && yMatch;
       })
       .reduce((acc, e) => acc + (Number(e.value) || 0), 0);
-  }, [expenses, analysisMonth, analysisYear]);
+  }, [outflows, analysisMonth, analysisYear]);
 
   const filteredBalanceAnalysis = filteredRevenueAnalysis - filteredExpensesAnalysis;
 
@@ -269,7 +294,21 @@ const Finance: React.FC<Props> = ({ payments, players, setPayments, expenses, se
             type: 'IN' as const
         }));
 
-      const eList = expenses
+      const extraIncList = extraRevenues
+        .filter(e => {
+            const d = parseSafeDate(e.date);
+            return MONTHS[d.getMonth()] === analysisMonth && d.getFullYear().toString() === analysisYear;
+        })
+        .map(e => ({
+            id: e.id,
+            date: e.date,
+            desc: e.description,
+            subLabel: e.category,
+            value: e.value,
+            type: 'IN' as const
+        }));
+
+      const eList = outflows
         .filter(e => {
             const d = parseSafeDate(e.date);
             return MONTHS[d.getMonth()] === analysisMonth && d.getFullYear().toString() === analysisYear;
@@ -284,15 +323,15 @@ const Finance: React.FC<Props> = ({ payments, players, setPayments, expenses, se
         }));
 
       // Unir e ordenar por data (mais recente primeiro)
-      return [...pList, ...eList].sort((a, b) => {
+      return [...pList, ...extraIncList, ...eList].sort((a, b) => {
           const dateA = a.date ? new Date(a.date).getTime() : 0;
           const dateB = b.date ? new Date(b.date).getTime() : 0;
           return dateB - dateA;
       });
-  }, [payments, expenses, players, analysisMonth, analysisYear]);
+  }, [payments, outflows, extraRevenues, players, analysisMonth, analysisYear]);
 
 
-  // ATUALIZADO: Agora aceita monthRef para saber exatamente qual registro alterar
+  // PAGAMENTOS ACTIONS
   const togglePayment = (playerId: string, monthRef: string) => {
     setPayments(prev => {
       const existingIdx = prev.findIndex(p => p.playerId === playerId && p.month === monthRef);
@@ -339,52 +378,102 @@ const Finance: React.FC<Props> = ({ payments, players, setPayments, expenses, se
     });
   };
 
-  const [newExpenseDesc, setNewExpenseDesc] = useState('');
-  const [newExpenseValue, setNewExpenseValue] = useState('');
-  const [newExpenseDate, setNewExpenseDate] = useState(new Date().toISOString().split('T')[0]);
-  const [newExpenseType, setNewExpenseType] = useState<'Fixa' | 'Variável'>('Variável');
-
+  // GENERIC TRANSACTION FORM STATE
+  const [newDesc, setNewDesc] = useState('');
+  const [newValue, setNewValue] = useState('');
+  const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0]);
+  const [newCategory, setNewCategory] = useState<string>('Variável');
+  
+  // Handlers for Expenses (Outflows)
   const handleSaveExpense = () => {
-    if (!newExpenseDesc || !newExpenseValue) return;
-    const val = parseFloat(newExpenseValue) || 0;
+    if (!newDesc || !newValue) return;
+    const val = parseFloat(newValue) || 0;
     if (editingExpense) {
-      setExpenses(prev => prev.map(e => e.id === editingExpense.id ? { ...e, description: newExpenseDesc.toUpperCase(), value: val, date: newExpenseDate, category: newExpenseType } : e));
+      setExpenses(prev => prev.map(e => e.id === editingExpense.id ? { 
+          ...e, description: newDesc.toUpperCase(), value: val, date: newDate, category: newCategory, type: 'expense' 
+      } : e));
     } else {
-      setExpenses(prev => [{ id: Date.now().toString(), description: newExpenseDesc.toUpperCase(), value: val, date: newExpenseDate, category: newExpenseType }, ...prev]);
+      setExpenses(prev => [{ 
+          id: Date.now().toString(), description: newDesc.toUpperCase(), value: val, date: newDate, category: newCategory, type: 'expense' 
+      }, ...prev]);
+    }
+    resetForm();
+  };
+
+  // Handlers for Incomes (Extra Revenue)
+  const handleSaveIncome = () => {
+    if (!newDesc || !newValue) return;
+    const val = parseFloat(newValue) || 0;
+    if (editingExpense) { // Reusing editingExpense state for convenience
+      setExpenses(prev => prev.map(e => e.id === editingExpense.id ? { 
+          ...e, description: newDesc.toUpperCase(), value: val, date: newDate, category: newCategory, type: 'income' 
+      } : e));
+    } else {
+      setExpenses(prev => [{ 
+          id: Date.now().toString(), description: newDesc.toUpperCase(), value: val, date: newDate, category: newCategory, type: 'income' 
+      }, ...prev]);
     }
     resetForm();
   };
 
   const handleDeleteExpense = (id: string) => {
-    if (window.confirm('Deseja realmente excluir este lançamento de saída?')) {
+    if (window.confirm('Deseja realmente excluir este lançamento?')) {
       setExpenses(prev => prev.filter(e => String(e.id) !== String(id)));
     }
   };
 
   const resetForm = () => {
     setEditingExpense(null);
-    setNewExpenseDesc('');
-    setNewExpenseValue('');
-    setNewExpenseDate(new Date().toISOString().split('T')[0]);
+    setNewDesc('');
+    setNewValue('');
+    setNewDate(new Date().toISOString().split('T')[0]);
     setShowExpenseForm(false);
+    setShowIncomeForm(false);
   };
 
+  // Pre-fill form for editing
+  const openEdit = (ex: Expense) => {
+      setEditingExpense(ex);
+      setNewDesc(ex.description);
+      setNewValue(ex.value.toString());
+      setNewDate(ensureISO(ex.date));
+      setNewCategory(ex.category);
+      if (ex.type === 'income') setShowIncomeForm(true);
+      else setShowExpenseForm(true);
+  };
+
+  // SHARING
   const handleShareMonthlyReport = () => {
-      const totalReceived = paidPlayers.reduce((acc, curr) => acc + (curr.payment?.value || 0), 0);
+      const totalFees = paidPlayers.reduce((acc, curr) => acc + (curr.payment?.value || 0), 0);
+      const totalExtra = filteredExtraRevenues.reduce((acc, curr) => acc + curr.value, 0);
+      const totalReceived = totalFees + totalExtra;
       
       let text = `*FINANCEIRO 100 FIRULA*\n`;
       text += `📅 *Período:* ${currentPeriod}\n\n`;
       
-      text += `✅ *RECEBIDOS (${paidPlayers.length})*\n`;
+      text += `✅ *RECEBIDOS (${paidPlayers.length + filteredExtraRevenues.length})*\n`;
       text += `💰 *Total Arrecadado:* R$ ${totalReceived.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n`;
       text += `━━━━━━━━━━━━━━━━━━\n`;
       
+      // Mensalidades
       if (paidPlayers.length > 0) {
+        text += `\n*--- Mensalidades ---*\n`;
         paidPlayers.forEach(p => {
            const val = (p.payment?.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
            text += `▪ ${p.player.name} (R$ ${val})\n`;
         });
-      } else {
+      }
+      
+      // Extras
+      if (filteredExtraRevenues.length > 0) {
+          text += `\n*--- Outras Receitas ---*\n`;
+          filteredExtraRevenues.forEach(ex => {
+              const val = ex.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+              text += `▪ ${ex.description} (R$ ${val})\n`;
+          });
+      }
+
+      if (paidPlayers.length === 0 && filteredExtraRevenues.length === 0) {
         text += `_Nenhum pagamento registrado._\n`;
       }
       
@@ -675,10 +764,89 @@ Valeu`;
                     </div>
                   </div>
                 )) : (
-                  <div className="py-10 text-center opacity-10 text-[9px] font-black uppercase tracking-widest">Nenhum pagamento recebido em {currentPeriod}</div>
+                  <div className="py-10 text-center opacity-10 text-[9px] font-black uppercase tracking-widest">Nenhuma mensalidade recebida em {currentPeriod}</div>
                 )}
               </div>
             </div>
+
+            <div className="h-px bg-white/5 mx-2"></div>
+            
+            {/* SEÇÃO DE OUTRAS RECEITAS */}
+            <div className="space-y-4">
+               <div className="flex items-center justify-between px-2">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-[#F4BE02]/10 flex items-center justify-center">
+                    <TrendingUp size={16} className="text-[#F4BE02]" />
+                  </div>
+                  <div className="flex flex-col">
+                    <h3 className="text-xs font-black uppercase tracking-widest text-white/60">Outras Receitas</h3>
+                    <span className="text-[7px] font-black uppercase tracking-wider text-[#F4BE02]/40">Ref: {currentPeriod}</span>
+                  </div>
+                </div>
+              </div>
+
+              {!showIncomeForm ? (
+                <button onClick={() => setShowIncomeForm(true)} className="w-full bg-white/[0.03] border border-dashed border-white/20 hover:border-[#F4BE02] text-white/40 p-4 rounded-[24px] flex items-center justify-center gap-3 transition-all">
+                  <Plus size={16}/> <span className="text-xs font-black uppercase tracking-widest">Adicionar Receita Extra</span>
+                </button>
+              ) : (
+                <div className="bg-[#0A0A0A] p-5 rounded-[24px] border border-white/10 space-y-4 animate-in fade-in slide-in-from-top-2">
+                   <div className="flex justify-between items-center mb-1">
+                      <h4 className="font-bold text-sm uppercase text-[#F4BE02]">Nova Receita</h4>
+                      <button onClick={resetForm} className="text-[9px] font-black text-white/20 uppercase tracking-widest">Cancelar</button>
+                   </div>
+                   <div className="space-y-4">
+                      <input type="text" placeholder="DESCRIÇÃO (EX: PATROCÍNIO)" className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm font-bold uppercase outline-none focus:border-[#F4BE02]/50" value={newDesc} onChange={e => setNewDesc(e.target.value.toUpperCase())} />
+                      <div className="grid grid-cols-2 gap-3">
+                        <input type="number" placeholder="VALOR" className="bg-white/5 border border-white/10 rounded-xl p-4 text-sm font-bold outline-none" value={newValue} onChange={e => setNewValue(e.target.value)} />
+                        <input type="date" className="bg-white/5 border border-white/10 rounded-xl p-4 text-[10px] font-bold outline-none" value={newDate} onChange={e => setNewDate(e.target.value)} />
+                      </div>
+                      <div className="flex gap-2">
+                        <button onClick={() => setNewCategory('Patrocínio')} className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase border ${newCategory === 'Patrocínio' ? 'bg-[#F4BE02] text-black border-[#F4BE02]' : 'bg-white/5 text-white/30 border-white/5'}`}>Patrocínio</button>
+                        <button onClick={() => setNewCategory('Rifa/Vendas')} className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase border ${newCategory === 'Rifa/Vendas' ? 'bg-[#F4BE02] text-black border-[#F4BE02]' : 'bg-white/5 text-white/30 border-white/5'}`}>Rifa</button>
+                        <button onClick={() => setNewCategory('Outros')} className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase border ${newCategory === 'Outros' ? 'bg-[#F4BE02] text-black border-[#F4BE02]' : 'bg-white/5 text-white/30 border-white/5'}`}>Outros</button>
+                      </div>
+                      <button onClick={handleSaveIncome} className="w-full bg-[#F4BE02] text-black font-black py-4 rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-yellow-500/20">Salvar Receita</button>
+                   </div>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {filteredExtraRevenues.length > 0 ? filteredExtraRevenues.map(ex => (
+                   <div key={ex.id} className="bg-[#0A0A0A] p-4 rounded-[24px] border border-white/5 flex items-center justify-between group">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center border bg-[#F4BE02]/10 border-[#F4BE02]/20 text-[#F4BE02]`}>
+                        <TrendingUp size={18} />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-xs uppercase truncate max-w-[140px] text-white/90">{ex.description}</h4>
+                        <span className="text-[8px] font-black uppercase tracking-widest text-white/20">{ex.category} • {parseSafeDate(ex.date).toLocaleDateString('pt-BR')}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="font-display font-bold text-[#F4BE02]">R$ {ex.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => openEdit(ex)} 
+                          className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/20 hover:text-white hover:bg-white/10 transition-all active:scale-90"
+                        >
+                          <Pencil size={12}/>
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteExpense(ex.id)} 
+                          className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center text-red-500/40 hover:text-red-500 hover:bg-red-500/20 transition-all active:scale-90"
+                        >
+                          <Trash2 size={12}/>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )) : (
+                  <div className="py-6 text-center opacity-10 text-[9px] font-black uppercase tracking-widest">Nenhuma receita extra registrada</div>
+                )}
+              </div>
+            </div>
+
           </div>
         </section>
       )}
@@ -696,14 +864,14 @@ Valeu`;
                   <button onClick={resetForm} className="text-[9px] font-black text-white/20 uppercase tracking-widest">Fechar</button>
                </div>
                <div className="space-y-4">
-                  <input type="text" placeholder="DESCRIÇÃO" className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm font-bold uppercase outline-none focus:border-[#F4BE02]/50" value={newExpenseDesc} onChange={e => setNewExpenseDesc(e.target.value.toUpperCase())} />
+                  <input type="text" placeholder="DESCRIÇÃO" className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-sm font-bold uppercase outline-none focus:border-[#F4BE02]/50" value={newDesc} onChange={e => setNewDesc(e.target.value.toUpperCase())} />
                   <div className="grid grid-cols-2 gap-3">
-                    <input type="number" placeholder="VALOR" className="bg-white/5 border border-white/10 rounded-xl p-4 text-sm font-bold outline-none" value={newExpenseValue} onChange={e => setNewExpenseValue(e.target.value)} />
-                    <input type="date" className="bg-white/5 border border-white/10 rounded-xl p-4 text-[10px] font-bold outline-none" value={newExpenseDate} onChange={e => setNewExpenseDate(e.target.value)} />
+                    <input type="number" placeholder="VALOR" className="bg-white/5 border border-white/10 rounded-xl p-4 text-sm font-bold outline-none" value={newValue} onChange={e => setNewValue(e.target.value)} />
+                    <input type="date" className="bg-white/5 border border-white/10 rounded-xl p-4 text-[10px] font-bold outline-none" value={newDate} onChange={e => setNewDate(e.target.value)} />
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={() => setNewExpenseType('Fixa')} className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase border ${newExpenseType === 'Fixa' ? 'bg-[#F4BE02] text-black border-[#F4BE02]' : 'bg-white/5 text-white/30 border-white/5'}`}>Fixa</button>
-                    <button onClick={() => setNewExpenseType('Variável')} className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase border ${newExpenseType === 'Variável' ? 'bg-white text-black border-white' : 'bg-white/5 text-white/30 border-white/5'}`}>Variável</button>
+                    <button onClick={() => setNewCategory('Fixa')} className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase border ${newCategory === 'Fixa' ? 'bg-[#F4BE02] text-black border-[#F4BE02]' : 'bg-white/5 text-white/30 border-white/5'}`}>Fixa</button>
+                    <button onClick={() => setNewCategory('Variável')} className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase border ${newCategory === 'Variável' ? 'bg-white text-black border-white' : 'bg-white/5 text-white/30 border-white/5'}`}>Variável</button>
                   </div>
                   <button onClick={handleSaveExpense} className="w-full bg-red-600 text-white font-black py-4 rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-red-500/20">Salvar Saída</button>
                </div>
@@ -756,7 +924,7 @@ Valeu`;
                   <span className="font-display font-bold text-red-500">R$ {ex.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                   <div className="flex gap-2">
                     <button 
-                      onClick={() => { setEditingExpense(ex); setNewExpenseDesc(ex.description); setNewExpenseValue(ex.value.toString()); setNewExpenseDate(ensureISO(ex.date)); setNewExpenseType(ex.category as any); setShowExpenseForm(true); }} 
+                      onClick={() => openEdit(ex)} 
                       className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/20 hover:text-white hover:bg-white/10 transition-all active:scale-90"
                     >
                       <Pencil size={12}/>
@@ -901,7 +1069,7 @@ Valeu`;
           </div>
           <div className="space-y-2">
             {[...payments.filter(p => p.status === 'Pago').map(p => ({ ...p, type: 'IN' as const, dateLabel: p.paymentDate || 'SEM DATA', desc: players.find(pl => pl.id === p.playerId)?.name || 'ATLETA' })), 
-              ...expenses.map(e => ({ ...e, type: 'OUT' as const, dateLabel: e.date, desc: e.description }))
+              ...expenses.map(e => ({ ...e, type: e.type === 'income' ? 'IN' as const : 'OUT' as const, dateLabel: e.date, desc: e.description }))
             ].sort((a, b) => b.dateLabel.localeCompare(a.dateLabel)).map((item, i) => (
               <div key={i} className="bg-[#0A0A0A] p-4 rounded-[20px] border border-white/5 flex items-center justify-between">
                 <div className="flex items-center gap-3">

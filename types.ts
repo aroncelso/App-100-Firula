@@ -10,6 +10,7 @@ export interface Player {
   redCards: number;
   whatsapp?: string;
   active?: boolean;
+  paymentType?: 'Mensalista' | 'Avulso';
 }
 
 export type EventType = 
@@ -78,6 +79,7 @@ export interface Expense {
   value: number;
   date: string;
   category: 'Fixa' | 'Variável' | string;
+  type?: 'income' | 'expense'; // Novo campo para diferenciar Receita (income) de Despesa (expense)
 }
 
 export interface ScoringRule {

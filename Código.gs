@@ -8,7 +8,7 @@
 const CONFIG = {
   'JOGADORES': [
     'ID', 'NOME', 'POSIÇÃO', 'GOLS', 'ASSISTÊNCIAS', 'JOGOS', 
-    'CARTÕES AMARELOS', 'CARTÕES VERMELHOS', 'WHATSAPP', 'ATIVO'
+    'CARTÕES AMARELOS', 'CARTÕES VERMELHOS', 'WHATSAPP', 'ATIVO', 'TIPO'
   ],
   'PARTIDAS': [
     'ID', 'DATA', 'ADVERSÁRIO', 'QUADRO', 'TÉCNICO', 'AMISTOSO', 'WO', 'OBSERVAÇÕES', 
@@ -24,7 +24,7 @@ const CONFIG = {
     'FALTAS', 'GOL CONTRA', 'PÊNALTI SOFRIDO', 'PÊNALTI COMETIDO', 'PÊNALTI PERDIDO', 'NOTA MÉDIA', 'DETALHES_AVALIACAO'
   ],
   'DESPESAS': [
-    'ID', 'DATA', 'DESCRIÇÃO', 'VALOR', 'CATEGORIA'
+    'ID', 'DATA', 'DESCRIÇÃO', 'VALOR', 'CATEGORIA', 'TIPO'
   ],
   'MENSALIDADES': [
     'ID ATLETA', 'NOME ATLETA', 'STATUS', 'VALOR', 'DATA PAGAMENTO'
@@ -71,7 +71,7 @@ function doGet() {
     if (sheetPlayers.getLastRow() > 1) {
       sheetPlayers.getDataRange().getValues().slice(1).forEach(row => {
         if (!row[0]) return;
-        result.PLAYERS.push({ id: row[0].toString(), name: row[1], position: row[2], goals: Number(row[3]) || 0, assists: Number(row[4]) || 0, jogos: Number(row[5]) || 0, yellowCards: Number(row[6]) || 0, redCards: Number(row[7]) || 0, whatsapp: row[8], active: row[9] !== 'Não' });
+        result.PLAYERS.push({ id: row[0].toString(), name: row[1], position: row[2], goals: Number(row[3]) || 0, assists: Number(row[4]) || 0, jogos: Number(row[5]) || 0, yellowCards: Number(row[6]) || 0, redCards: Number(row[7]) || 0, whatsapp: row[8], active: row[9] !== 'Não', tipo: row[10] });
       });
     }
 
@@ -109,7 +109,14 @@ function doGet() {
     if (sheetExpenses.getLastRow() > 1) {
       sheetExpenses.getDataRange().getValues().slice(1).forEach(row => {
         if (!row[0]) return;
-        result.EXPENSES.push({ id: row[0].toString(), data: formatDate(row[1]), description: row[2], value: Number(row[3]) || 0, category: row[4] });
+        result.EXPENSES.push({ 
+          id: row[0].toString(), 
+          data: formatDate(row[1]), 
+          description: row[2], 
+          value: Number(row[3]) || 0, 
+          category: row[4],
+          tipo: row[5] || 'expense' // Padrão 'expense' para compatibilidade
+        });
       });
     }
 
@@ -162,7 +169,7 @@ function doPost(e) {
     };
 
     // 1. JOGADORES
-    syncSheet('JOGADORES', allData.PLAYERS.map(p => [p.id, p.name, p.position, p.goals, p.assists, p.jogos, p.yellowCards, p.redCards, p.whatsapp, p.active === false ? 'Não' : 'Sim']));
+    syncSheet('JOGADORES', allData.PLAYERS.map(p => [p.id, p.name, p.position, p.goals, p.assists, p.jogos, p.yellowCards, p.redCards, p.whatsapp, p.active === false ? 'Não' : 'Sim', p.tipo]));
     
     // 2. PARTIDAS
     syncSheet('PARTIDAS', allData.PARTIDAS.map(m => [
@@ -224,7 +231,9 @@ function doPost(e) {
     }
 
     // 4. OUTRAS PLANILHAS
-    syncSheet('DESPESAS', allData.EXPENSES.map(ex => [ex.id, ex.date, ex.description, ex.value, ex.category]));
+    // DESPESAS agora inclui TIPO na coluna 6 (indice 5 no array se fosse 0-based, mas aqui é valor direto)
+    syncSheet('DESPESAS', allData.EXPENSES.map(ex => [ex.id, ex.date, ex.description, ex.value, ex.category, ex.type || 'expense']));
+    
     syncSheet('MENSALIDADES', allData.PAYMENTS.map(py => [py.playerId, py.nomeAtleta, py.status, py.value, py.paymentDate || ""]));
     syncSheet('REGRAS_CARTOLA', allData.RULES.map(r => [r.id, r.label, r.category, r.value, r.active ? 'Sim' : 'Não', r.type]));
 

@@ -147,7 +147,7 @@ const App: React.FC = () => {
   const renderScreen = () => {
     switch (currentScreen) {
       case 'DASHBOARD': return <Dashboard players={players} matches={matches} />;
-      case 'SUMULAS': return <Sumulas matches={matches} players={players} setMatches={setMatches} />;
+      case 'SUMULAS': return <Sumulas matches={matches} players={players} setPlayers={setPlayers} setMatches={setMatches} />;
       case 'JOGADORES': return <Players players={players} matches={matches} onAddPlayer={() => { setEditingPlayer(null); setCurrentScreen('CADASTRO_JOGADOR'); }} onEditPlayer={(p) => { setEditingPlayer(p); setCurrentScreen('EDITAR_JOGADOR'); }} />;
       case 'FINANCEIRO': return <Finance payments={payments} players={players} setPayments={setPayments} expenses={expenses} setExpenses={setExpenses} />;
       case 'CADASTRO_JOGADOR': return <PlayerForm onSave={savePlayer} onCancel={() => setCurrentScreen('JOGADORES')} />;
