@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Player, Payment, Expense } from '../types';
-import { Wallet, TrendingUp, TrendingDown, Plus, Banknote, Calendar, Receipt, History, DollarSign, Layers, BarChart3, PieChart, ArrowUpCircle, ArrowDownCircle, Trash2, Pencil, AlertCircle, CheckCircle2, RotateCcw, Lock, Users, UserMinus, UserCheck, Clock, Filter, ChevronDown, Search, FileText, ArrowUpRight, ArrowDownRight } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, Plus, Banknote, Calendar, Receipt, History, DollarSign, Layers, BarChart3, PieChart, ArrowUpCircle, ArrowDownCircle, Trash2, Pencil, AlertCircle, CheckCircle2, RotateCcw, Lock, Users, UserMinus, UserCheck, Clock, Filter, ChevronDown, Search, FileText, ArrowUpRight, ArrowDownRight, Share2, MessageCircle } from 'lucide-react';
 
 interface Props {
   payments: Payment[];
@@ -369,6 +369,86 @@ const Finance: React.FC<Props> = ({ payments, players, setPayments, expenses, se
     setShowExpenseForm(false);
   };
 
+  const handleShareMonthlyReport = () => {
+      const totalReceived = paidPlayers.reduce((acc, curr) => acc + (curr.payment?.value || 0), 0);
+      
+      let text = `*FINANCEIRO 100 FIRULA*\n`;
+      text += `📅 *Período:* ${currentPeriod}\n\n`;
+      
+      text += `✅ *RECEBIDOS (${paidPlayers.length})*\n`;
+      text += `💰 *Total Arrecadado:* R$ ${totalReceived.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n`;
+      text += `━━━━━━━━━━━━━━━━━━\n`;
+      
+      if (paidPlayers.length > 0) {
+        paidPlayers.forEach(p => {
+           const val = (p.payment?.value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+           text += `▪ ${p.player.name} (R$ ${val})\n`;
+        });
+      } else {
+        text += `_Nenhum pagamento registrado._\n`;
+      }
+      
+      text += `\n⚠️ *PENDENTES (${unpaidPlayers.length})*\n`;
+      text += `━━━━━━━━━━━━━━━━━━\n`;
+      if (unpaidPlayers.length > 0) {
+        unpaidPlayers.forEach(p => {
+           text += `▪ ${p.player.name}\n`;
+        });
+      } else {
+        text += `_Todos em dia!_\n`;
+      }
+
+      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  const handleShareAnalysis = () => {
+    const fmtMoney = (val: number) => val.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+    
+    let text = `*RELATÓRIO FINANCEIRO - 100 FIRULA*\n\n`;
+    
+    // Saldo Geral
+    text += `💰 *SALDO GERAL ACUMULADO*\n`;
+    text += `R$ ${fmtMoney(globalBalance)}\n`;
+    text += `━━━━━━━━━━━━━━━━━━\n\n`;
+    
+    // Resumo do Período
+    text += `📅 *PERÍODO: ${analysisPeriod}*\n`;
+    text += `🟢 Entradas: R$ ${fmtMoney(filteredRevenueAnalysis)}\n`;
+    text += `🔴 Saídas: R$ ${fmtMoney(filteredExpensesAnalysis)}\n`;
+    text += `🔹 *Saldo do Mês: R$ ${fmtMoney(filteredBalanceAnalysis)}*\n\n`;
+    
+    // Detalhamento
+    text += `📝 *DETALHAMENTO*\n`;
+    if (detailedAnalysisList.length > 0) {
+      detailedAnalysisList.forEach(item => {
+         const sign = item.type === 'IN' ? '+' : '-';
+         const dateStr = parseSafeDate(item.date).toLocaleDateString('pt-BR');
+         text += `${sign} R$ ${fmtMoney(item.value)} | ${item.desc} (${dateStr})\n`;
+      });
+    } else {
+      text += `_Sem movimentações neste período._\n`;
+    }
+    
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  const handleNotifyPlayer = (player: Player) => {
+    if (!player.whatsapp) {
+        alert('Este atleta não possui WhatsApp cadastrado.');
+        return;
+    }
+
+    const cleanPhone = player.whatsapp.replace(/\D/g, '');
+    const finalPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
+
+    const text = `Eai, ${player.name}, tudo bem?
+A mensalidade do 100 Firula referente a ${currentPeriod}, no valor de R$ 100,00, ainda está pendente.
+Quando puder regularizar, por favor me avise.
+Valeu`;
+
+    window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
   return (
     <div className="space-y-6 pb-20">
       <div className="px-1 flex justify-between items-center">
@@ -436,8 +516,15 @@ const Finance: React.FC<Props> = ({ payments, players, setPayments, expenses, se
                     <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 pointer-events-none" />
                 </div>
             </div>
-            <div className="flex justify-center">
-                <span className="text-[8px] font-bold text-[#F4BE02]/60 uppercase tracking-[0.3em]">Período: {currentPeriod}</span>
+            <div className="flex justify-center items-center gap-2 pt-2">
+                <span className="text-[8px] font-bold text-[#F4BE02]/60 uppercase tracking-[0.3em] flex-1 text-center">Período: {currentPeriod}</span>
+                <button 
+                  onClick={handleShareMonthlyReport}
+                  className="bg-green-500/10 hover:bg-green-500/20 text-green-500 border border-green-500/20 px-4 py-2 rounded-xl flex items-center gap-2 transition-all active:scale-95"
+                >
+                  <Share2 size={12} />
+                  <span className="text-[8px] font-black uppercase tracking-widest">Compartilhar</span>
+                </button>
             </div>
           </div>
 
@@ -486,6 +573,12 @@ const Finance: React.FC<Props> = ({ payments, players, setPayments, expenses, se
                             className="bg-transparent flex-1 text-right font-display font-bold text-sm text-[#F4BE02] outline-none placeholder:text-white/5" 
                         />
                       </div>
+                      <button
+                        onClick={() => handleNotifyPlayer(player)}
+                        className="w-11 h-11 rounded-xl bg-green-500/10 border border-green-500/20 text-green-500 flex items-center justify-center hover:bg-green-500 hover:text-black transition-all"
+                      >
+                        <MessageCircle size={20} />
+                      </button>
                     </div>
                   </div>
                 )) : (
@@ -687,6 +780,15 @@ const Finance: React.FC<Props> = ({ payments, players, setPayments, expenses, se
                     </select>
                     <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 pointer-events-none" />
                 </div>
+            </div>
+            <div className="flex justify-center items-center gap-2 pt-2">
+                <button 
+                  onClick={handleShareAnalysis}
+                  className="bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 border border-blue-500/20 px-4 py-2 rounded-xl flex items-center gap-2 transition-all active:scale-95"
+                >
+                  <Share2 size={12} />
+                  <span className="text-[8px] font-black uppercase tracking-widest">Compartilhar Análise</span>
+                </button>
             </div>
           </div>
 

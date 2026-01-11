@@ -270,7 +270,7 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
           const yellowList = getPlayerNamesByEvent('AMARELO');
           const redList = getPlayerNamesByEvent('VERMELHO');
 
-          text += `🏆 *${match.label.toUpperCase()}*\n`;
+          text += `🏆 *${match.label.toUpperCase()}*${match.isFriendly ? ' (AMISTOSO)' : ''}\n`;
           text += `⚔️ 100 Firula ${score.us} x ${score.them} ${match.opponent}\n`;
           
           if (goalsList) text += `⚽ *Gols:* ${goalsList}\n`;
@@ -280,8 +280,9 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
           
           if (mvp) text += `👑 *Craque:* ${mvp}\n`;
           if (match.coach) text += `👨‍💼 *Técnico:* ${match.coach}\n`;
+          if (match.referee) text += `🚩 *Árbitro:* ${match.referee}\n`;
           
-          if (match.notes) text += `📝 ${match.notes}\n`;
+          if (match.notes) text += `📝 *Obs:* ${match.notes}\n`;
 
           if (index < sortedMatches.length - 1) {
               text += `\n━━━━━━━━━━━━━━━━━━\n\n`;
