@@ -1,11 +1,12 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Match, Player, EventType, MatchEvent, HalfStats } from '../types';
+import { Match, Player, EventType, MatchEvent, HalfStats, RatingDetail } from '../types';
 import { 
-  Plus, X, Calendar, Save, Minus, CheckCircle2, Pencil, 
+  Plus, X, Calendar, Minus, CheckCircle2, Pencil, 
   Trophy, Star, Crown, Users, Check, Square, ShieldAlert,
-  Zap, Target, AlertTriangle, Trash2, ChevronRight, UserCheck,
-  Ban, MinusCircle, AlertCircle, UserCog, Filter, ChevronDown
+  Zap, Target, AlertTriangle, UserCheck,
+  Ban, MinusCircle, AlertCircle, UserCog, Filter, ChevronDown, Flag,
+  LayoutGrid, Image as ImageIcon, Search
 } from 'lucide-react';
 
 interface Props {
@@ -16,20 +17,27 @@ interface Props {
 
 type QuadroType = 'Quadro 1' | 'Quadro 2';
 
+const HOME_TEAM_LOGO = "https://i.postimg.cc/tR3cPQZd/100-firula-II-removebg-preview.png";
+
 const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
   const currentYear = new Date().getFullYear().toString();
   const [showForm, setShowForm] = useState(false);
   const [showRosterModal, setShowRosterModal] = useState(false);
+  
+  // Rating State
   const [ratingMatchId, setRatingMatchId] = useState<string | null>(null);
-  const [tempRatings, setTempRatings] = useState<Record<string, number>>({});
+  const [currentEvaluatorId, setCurrentEvaluatorId] = useState<string>('');
+  
+  // Controle da Partida Ativa (Sessão de Edição)
+  const [activeQuadro, setActiveQuadro] = useState<QuadroType>('Quadro 2');
+  const [sessionMatchIds, setSessionMatchIds] = useState<{ q1: string | null, q2: string | null }>({ q1: null, q2: null });
   const [currentTempo, setCurrentTempo] = useState<1 | 2>(1);
   const [activeStep, setActiveStep] = useState<'info' | 'events'>('info');
 
   // --- LÓGICA DE FILTROS INTELIGENTES ---
   const [filterYear, setFilterYear] = useState(currentYear);
-  const [filterQuadro, setFilterQuadro] = useState('Todos');
+  const [searchTerm, setSearchTerm] = useState('');
 
-  // 1. Extrair Anos disponíveis com base nas partidas existentes
   const availableYears = useMemo(() => {
     const years = new Set<string>();
     matches.forEach(m => {
@@ -38,198 +46,173 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
         if (y && y.length === 4) years.add(y);
       }
     });
-    years.add(currentYear); // Sempre inclui o ano atual
+    years.add(currentYear);
     return Array.from(years).sort().reverse();
   }, [matches, currentYear]);
 
-  // 2. Extrair Quadros disponíveis naquele ano selecionado
-  const availableQuadros = useMemo(() => {
-    const quadros = new Set<string>();
-    matches.forEach(m => {
-        const y = String(m.date).split('-')[0];
-        if (y === filterYear) {
-            quadros.add(m.label);
-        }
-    });
-    // Sempre garante as opções padrão se não houver dados
-    if (quadros.size === 0) {
-        quadros.add('Quadro 1');
-        quadros.add('Quadro 2');
-    }
-    return Array.from(quadros).sort();
-  }, [matches, filterYear]);
-
-  // 3. Filtrar as partidas
   const filteredMatches = useMemo(() => {
     return matches.filter(m => {
         const mYear = String(m.date).split('-')[0];
         const yearMatch = mYear === filterYear;
-        const quadroMatch = filterQuadro === 'Todos' || m.label === filterQuadro;
-        return yearMatch && quadroMatch;
+        const nameMatch = (m.opponent || '').toLowerCase().includes(searchTerm.toLowerCase());
+        return yearMatch && nameMatch;
     });
-  }, [matches, filterYear, filterQuadro]);
+  }, [matches, filterYear, searchTerm]);
 
-  // Resetar quadro para 'Todos' se mudar de ano e o quadro não existir (opcional, mas boa UX)
-  useEffect(() => {
-      if (filterQuadro !== 'Todos' && !availableQuadros.includes(filterQuadro)) {
-          setFilterQuadro('Todos');
-      }
-  }, [filterYear, availableQuadros]);
+  // Agrupamento visual por Data (Rodada)
+  const groupedMatches = useMemo(() => {
+    const groups: Record<string, Match[]> = {};
+    filteredMatches.forEach(m => {
+      const dateKey = m.date || 'Sem Data';
+      if (!groups[dateKey]) groups[dateKey] = [];
+      groups[dateKey].push(m);
+    });
+    // Ordena as datas
+    return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
+  }, [filteredMatches]);
 
-  // --------------------------------------
+  const activePlayers = useMemo(() => players.filter(p => p.active !== false).sort((a,b) => a.name.localeCompare(b.name)), [players]);
 
   const createEmptyHalf = (): HalfStats => ({ fouls: 0, opponentGoals: 0, opponentFouls: 0, events: [] });
 
-  const [formMatch, setFormMatch] = useState<Partial<Match> & { roster: string[] }>({
-    opponent: '',
-    date: new Date().toISOString().split('T')[0],
-    label: 'Quadro 2',
+  const createNewMatchObject = (id: string, label: QuadroType, date: string, opponent: string, isFriendly: boolean): Match => ({
+    id,
+    date,
+    opponent,
+    opponentLogo: '',
+    label,
     stats: { tempo1: createEmptyHalf(), tempo2: createEmptyHalf() },
     notes: '',
     roster: [],
+    detailedRatings: {},
+    playerRatings: {},
     coach: '',
-    isFriendly: false,
+    referee: '',
+    isFriendly,
     wo: 'none'
   });
 
-  // Função interna para sincronizar o formMatch atual com o estado global de matches
-  const syncMatchToGlobal = (updated: Partial<Match>) => {
-    if (!updated.id) return;
-    setMatches(prev => {
-      const exists = prev.find(m => m.id === updated.id);
-      if (exists) {
-        return prev.map(m => m.id === updated.id ? { ...m, ...updated } as Match : m);
-      }
-      return [...prev, updated as Match];
-    });
-  };
+  // --- GESTÃO DE ESTADO E SYNC ---
 
-  // Handlers
-  const handleNewMatch = () => {
-    setFormMatch({
-      opponent: '',
-      date: new Date().toISOString().split('T')[0],
-      label: 'Quadro 2',
-      stats: { tempo1: createEmptyHalf(), tempo2: createEmptyHalf() },
-      notes: '',
-      roster: [],
-      coach: '',
-      isFriendly: false,
-      wo: 'none'
-    });
-    setActiveStep('info');
-    setShowForm(true);
-  };
+  const currentMatch = useMemo(() => {
+    const id = activeQuadro === 'Quadro 1' ? sessionMatchIds.q1 : sessionMatchIds.q2;
+    return matches.find(m => m.id === id);
+  }, [matches, activeQuadro, sessionMatchIds]);
 
-  const handleEditMatch = (match: Match) => {
-    setFormMatch({
-      ...JSON.parse(JSON.stringify(match)),
-      roster: match.roster || []
-    });
-    setActiveStep('info');
-    setShowForm(true);
-  };
-
-  const handleGoToCampo = () => {
-    if (!formMatch.opponent) return;
+  const updateMatchInGlobal = (updatedMatch: Match) => {
+    setMatches(prev => prev.map(m => m.id === updatedMatch.id ? updatedMatch : m));
     
-    // Gera ID se não existir e já insere no estado global para iniciar o sync
-    const matchData = {
-      ...formMatch,
-      opponent: formMatch.opponent.toUpperCase(),
-      notes: formMatch.notes?.toUpperCase(),
-      id: formMatch.id || Date.now().toString(),
-    };
+    // Sincroniza campos comuns
+    const partnerId = updatedMatch.label === 'Quadro 1' ? sessionMatchIds.q2 : sessionMatchIds.q1;
+    if (partnerId) {
+      setMatches(prev => prev.map(m => {
+        if (m.id === partnerId) {
+          if (m.date !== updatedMatch.date || m.opponent !== updatedMatch.opponent || m.isFriendly !== updatedMatch.isFriendly || m.opponentLogo !== updatedMatch.opponentLogo) {
+            return {
+              ...m,
+              date: updatedMatch.date,
+              opponent: updatedMatch.opponent,
+              opponentLogo: updatedMatch.opponentLogo,
+              isFriendly: updatedMatch.isFriendly
+            };
+          }
+        }
+        return m;
+      }));
+    }
+  };
 
-    setFormMatch(matchData);
-    syncMatchToGlobal(matchData as Match);
-    setActiveStep('events');
+  // --- HANDLERS ---
+
+  const handleNewMatchDay = () => {
+    const today = new Date().toISOString().split('T')[0];
+    const idQ2 = Date.now().toString();
+    const idQ1 = (Date.now() + 1).toString();
+
+    const matchQ2 = createNewMatchObject(idQ2, 'Quadro 2', today, '', false);
+    const matchQ1 = createNewMatchObject(idQ1, 'Quadro 1', today, '', false);
+
+    setMatches(prev => [...prev, matchQ2, matchQ1]);
+    setSessionMatchIds({ q1: idQ1, q2: idQ2 });
+    setActiveQuadro('Quadro 2');
+    setActiveStep('info');
+    setShowForm(true);
+  };
+
+  const handleEditMatchGroup = (match: Match) => {
+    const partner = matches.find(m => m.date === match.date && m.label !== match.label);
+    
+    let q1Id = match.label === 'Quadro 1' ? match.id : partner?.label === 'Quadro 1' ? partner.id : null;
+    let q2Id = match.label === 'Quadro 2' ? match.id : partner?.label === 'Quadro 2' ? partner.id : null;
+
+    if (!q1Id) {
+       q1Id = Date.now().toString();
+       const newQ1 = createNewMatchObject(q1Id, 'Quadro 1', match.date, match.opponent, match.isFriendly || false);
+       setMatches(prev => [...prev, newQ1]);
+    }
+    if (!q2Id) {
+       q2Id = Date.now().toString();
+       const newQ2 = createNewMatchObject(q2Id, 'Quadro 2', match.date, match.opponent, match.isFriendly || false);
+       setMatches(prev => [...prev, newQ2]);
+    }
+
+    setSessionMatchIds({ q1: q1Id, q2: q2Id });
+    setActiveQuadro(match.label as QuadroType);
+    setActiveStep('info');
+    setShowForm(true);
   };
 
   const addEvent = (playerId: string, type: EventType) => {
+    if (!currentMatch) return;
     const tempoKey = currentTempo === 1 ? 'tempo1' : 'tempo2';
     const newEvent: MatchEvent = { id: Date.now().toString() + Math.random().toString(36).substr(2, 9), playerId, type };
     
-    setFormMatch(prev => {
-      const stats = { ...prev.stats! };
-      stats[tempoKey].events = [...stats[tempoKey].events, newEvent];
-      
-      if (type === 'FALTA') {
-        stats[tempoKey].fouls = (stats[tempoKey].fouls || 0) + 1;
-      }
-      
-      const updated = { ...prev, stats };
-      // Sincroniza instantaneamente com o estado global para envio automático
-      syncMatchToGlobal(updated);
-      return updated;
-    });
+    const updatedStats = { ...currentMatch.stats };
+    updatedStats[tempoKey].events = [...updatedStats[tempoKey].events, newEvent];
+    
+    if (type === 'FALTA') {
+      updatedStats[tempoKey].fouls = (updatedStats[tempoKey].fouls || 0) + 1;
+    }
+
+    updateMatchInGlobal({ ...currentMatch, stats: updatedStats });
   };
 
   const removeEvent = (eventId: string) => {
-    setFormMatch(prev => {
-      const stats = { ...prev.stats! };
-      
-      // Busca em qual tempo o evento está (T1 ou T2)
-      let foundInT1 = stats.tempo1.events.find(e => e.id === eventId);
-      let foundInT2 = stats.tempo2.events.find(e => e.id === eventId);
-
-      if (foundInT1) {
-        if (foundInT1.type === 'FALTA') {
-          stats.tempo1.fouls = Math.max(0, (stats.tempo1.fouls || 0) - 1);
-        }
+    if (!currentMatch) return;
+    const stats = { ...currentMatch.stats };
+    
+    if (stats.tempo1.events.some(e => e.id === eventId)) {
+        const evt = stats.tempo1.events.find(e => e.id === eventId);
+        if (evt?.type === 'FALTA') stats.tempo1.fouls = Math.max(0, (stats.tempo1.fouls || 0) - 1);
         stats.tempo1.events = stats.tempo1.events.filter(e => e.id !== eventId);
-      } else if (foundInT2) {
-        if (foundInT2.type === 'FALTA') {
-          stats.tempo2.fouls = Math.max(0, (stats.tempo2.fouls || 0) - 1);
-        }
+    }
+    else if (stats.tempo2.events.some(e => e.id === eventId)) {
+        const evt = stats.tempo2.events.find(e => e.id === eventId);
+        if (evt?.type === 'FALTA') stats.tempo2.fouls = Math.max(0, (stats.tempo2.fouls || 0) - 1);
         stats.tempo2.events = stats.tempo2.events.filter(e => e.id !== eventId);
-      }
-      
-      const updated = { ...prev, stats };
-      syncMatchToGlobal(updated);
-      return updated;
-    });
+    }
+
+    updateMatchInGlobal({ ...currentMatch, stats });
   };
 
   const updateOpponentStats = (field: 'opponentGoals' | 'opponentFouls', delta: number) => {
+    if (!currentMatch) return;
     const tempoKey = currentTempo === 1 ? 'tempo1' : 'tempo2';
-    setFormMatch(prev => {
-      const stats = { ...prev.stats! };
-      const currentVal = stats[tempoKey][field] || 0;
-      stats[tempoKey][field] = Math.max(0, currentVal + delta);
-      const updated = { ...prev, stats };
-      syncMatchToGlobal(updated);
-      return updated;
-    });
+    const stats = { ...currentMatch.stats };
+    stats[tempoKey][field] = Math.max(0, (stats[tempoKey][field] || 0) + delta);
+    updateMatchInGlobal({ ...currentMatch, stats });
   };
 
   const updateFouls = (delta: number) => {
+    if (!currentMatch) return;
     const tempoKey = currentTempo === 1 ? 'tempo1' : 'tempo2';
-    setFormMatch(prev => {
-      const stats = { ...prev.stats! };
-      const currentVal = stats[tempoKey].fouls || 0;
-      stats[tempoKey].fouls = Math.max(0, currentVal + delta);
-      const updated = { ...prev, stats };
-      syncMatchToGlobal(updated);
-      return updated;
-    });
+    const stats = { ...currentMatch.stats };
+    stats[tempoKey].fouls = Math.max(0, (stats[tempoKey].fouls || 0) + delta);
+    updateMatchInGlobal({ ...currentMatch, stats });
   };
 
-  const saveMatch = () => {
-    if (!formMatch.opponent) return;
-    const matchData = {
-      ...formMatch,
-      opponent: formMatch.opponent.toUpperCase(),
-      notes: formMatch.notes?.toUpperCase(),
-      id: formMatch.id || Date.now().toString(),
-    } as Match;
-
-    syncMatchToGlobal(matchData);
-    setShowForm(false);
-  };
-
-  const calculateScore = (m: Match | Partial<Match>) => {
-    if (!m.stats) return { us: 0, them: 0 };
+  const calculateScore = (m: Match | undefined) => {
+    if (!m || !m.stats) return { us: 0, them: 0 };
     const us = (m.stats.tempo1.events.filter(e => e.type === 'GOL').length) + 
                (m.stats.tempo2.events.filter(e => e.type === 'GOL').length);
     const them = (m.stats.tempo1.opponentGoals || 0) + (m.stats.tempo2.opponentGoals || 0);
@@ -249,17 +232,6 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
     return players.find(p => p.id === mvpId)?.name || null;
   };
 
-  // USA filteredMatches aqui para o agrupamento
-  const groupedMatches = useMemo(() => {
-    const groups: Record<string, Match[]> = {};
-    filteredMatches.forEach(m => {
-      const dateKey = m.date || 'Sem Data';
-      if (!groups[dateKey]) groups[dateKey] = [];
-      groups[dateKey].push(m);
-    });
-    return Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
-  }, [filteredMatches]);
-
   const getEventIcon = (type: EventType) => {
     switch (type) {
         case 'GOL': return <Target size={12} className="text-[#F4BE02]" />;
@@ -276,62 +248,150 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
   };
 
   const toggleSelectAll = () => {
-    const currentRoster = formMatch.roster || [];
+    if (!currentMatch) return;
+    const currentRoster = currentMatch.roster || [];
     const selectablePlayers = players.filter(p => p.active !== false);
     
+    let newRoster: string[];
     if (currentRoster.length === selectablePlayers.length) {
-      setFormMatch(prev => {
-          const updated = { ...prev, roster: [] };
-          syncMatchToGlobal(updated);
-          return updated;
-      });
+        newRoster = [];
     } else {
-      setFormMatch(prev => {
-          const updated = { ...prev, roster: selectablePlayers.map(p => p.id) };
-          syncMatchToGlobal(updated);
-          return updated;
-      });
+        newRoster = selectablePlayers.map(p => p.id);
     }
+    updateMatchInGlobal({ ...currentMatch, roster: newRoster });
   };
+
+  // --- LÓGICA DE AVALIAÇÃO (RATING) ---
+  const handleRatePlayer = (targetPlayerId: string, newScore: number) => {
+      if (!ratingMatchId || !currentEvaluatorId) return;
+      
+      setMatches(prev => prev.map(m => {
+          if (m.id !== ratingMatchId) return m;
+
+          // 1. Atualiza detalhes
+          const currentDetails = m.detailedRatings || {};
+          const playerDetails = currentDetails[targetPlayerId] || [];
+          
+          // Remove avaliação anterior deste avaliador se existir
+          const otherRatings = playerDetails.filter(r => r.evaluatorId !== currentEvaluatorId);
+          
+          // Adiciona nova (se > 0)
+          const updatedPlayerDetails = newScore > 0 
+              ? [...otherRatings, { evaluatorId: currentEvaluatorId, score: newScore }]
+              : otherRatings;
+
+          const newDetailedRatings = { ...currentDetails, [targetPlayerId]: updatedPlayerDetails };
+
+          // 2. Recalcula média
+          const scores = updatedPlayerDetails.map(r => r.score);
+          const avg = scores.length > 0 
+              ? scores.reduce((a, b) => a + b, 0) / scores.length 
+              : 0;
+
+          const newPlayerRatings = { ...m.playerRatings, [targetPlayerId]: avg };
+          
+          // Se média for 0, remove do objeto
+          if (avg === 0) delete newPlayerRatings[targetPlayerId];
+
+          return {
+              ...m,
+              detailedRatings: newDetailedRatings,
+              playerRatings: newPlayerRatings
+          };
+      }));
+  };
+
+  const getMyRatingForPlayer = (targetPlayerId: string): number => {
+      const m = matches.find(m => m.id === ratingMatchId);
+      if (!m || !m.detailedRatings || !currentEvaluatorId) return 0;
+      
+      const details = m.detailedRatings[targetPlayerId] || [];
+      const myRating = details.find(r => r.evaluatorId === currentEvaluatorId);
+      return myRating ? myRating.score : 0;
+  };
+
+  // --- RENDER ---
 
   return (
     <div className="space-y-6 pb-24">
-      {/* Somente exibe cabeçalho na lista principal */}
       {!showForm && (
         <div className="flex justify-between items-center px-1">
           <div>
-            <h2 className="text-2xl font-display font-bold">SÚMULAS</h2>
-            <p className="text-[10px] font-black text-[#F4BE02] uppercase tracking-widest">Controle de Partidas</p>
+            <h2 className="text-2xl font-display font-bold">PARTIDAS</h2>
+            <p className="text-[10px] font-black text-[#F4BE02] uppercase tracking-widest">Controle de Rodadas</p>
           </div>
           <button 
-            onClick={handleNewMatch}
-            className="bg-[#F4BE02] text-black px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-yellow-500/20"
+            onClick={handleNewMatchDay}
+            className="bg-[#F4BE02] text-black px-4 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-lg shadow-yellow-500/20 hover:scale-105 transition-transform"
           >
-            <Plus size={14} /> Novo Jogo
+            <Plus size={16} /> Nova Partida
           </button>
         </div>
       )}
 
-      {showForm ? (
-        <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-300">
-          {/* Menu de Etapas do Form */}
+      {showForm && currentMatch ? (
+        <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-300">
+          
+          {/* HEADER DA SESSÃO: Alternar Quadros */}
+          <div className="flex items-center gap-2 bg-[#111] p-1.5 rounded-2xl border border-white/10">
+             <button 
+                onClick={() => setActiveQuadro('Quadro 2')}
+                className={`flex-1 py-3 rounded-xl flex flex-col items-center gap-1 transition-all ${activeQuadro === 'Quadro 2' ? 'bg-[#F4BE02] text-black shadow-lg' : 'text-white/30 hover:bg-white/5'}`}
+             >
+                <span className="text-[10px] font-black uppercase tracking-widest">Quadro 2</span>
+             </button>
+             <button 
+                onClick={() => setActiveQuadro('Quadro 1')}
+                className={`flex-1 py-3 rounded-xl flex flex-col items-center gap-1 transition-all ${activeQuadro === 'Quadro 1' ? 'bg-[#F4BE02] text-black shadow-lg' : 'text-white/30 hover:bg-white/5'}`}
+             >
+                <span className="text-[10px] font-black uppercase tracking-widest">Quadro 1</span>
+             </button>
+          </div>
+
+          {/* Sub-menu de Etapas */}
           <div className="flex gap-2">
-            <button onClick={() => setActiveStep('info')} className={`flex-1 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all ${activeStep === 'info' ? 'bg-[#F4BE02] text-black shadow-lg' : 'bg-white/5 text-white/30'}`}>1. Informações</button>
-            <button onClick={handleGoToCampo} className={`flex-1 py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all ${activeStep === 'events' ? 'bg-[#F4BE02] text-black shadow-lg' : 'bg-white/5 text-white/30'}`}>2. Súmula de Campo</button>
+            <button onClick={() => setActiveStep('info')} className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${activeStep === 'info' ? 'bg-white text-black border-white' : 'bg-transparent text-white/30 border-white/10'}`}>1. Info & Elenco</button>
+            <button 
+                onClick={() => {
+                    if (!currentMatch.opponent) {
+                        alert('Informe o nome do adversário primeiro.');
+                        return;
+                    }
+                    setActiveStep('events');
+                }} 
+                className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ${activeStep === 'events' ? 'bg-white text-black border-white' : 'bg-transparent text-white/30 border-white/10'}`}
+            >
+                2. Súmula (Ao Vivo)
+            </button>
           </div>
 
           {activeStep === 'info' ? (
             <div className="bg-[#0A0A0A] p-6 rounded-[32px] border border-white/10 space-y-6">
               <div className="space-y-4">
+                {/* CAMPOS COMUNS */}
                 <div className="space-y-2">
-                  <label className="text-[9px] font-black uppercase tracking-widest text-white/30 ml-2">Nome do Adversário</label>
+                  <label className="text-[9px] font-black uppercase tracking-widest text-white/30 ml-2">Nome do Adversário (Comum)</label>
                   <input 
                     type="text" 
-                    placeholder="Nome do Time" 
+                    placeholder="NOME DO TIME RIVAL" 
                     className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 font-bold outline-none focus:border-[#F4BE02]/50 transition-all text-sm uppercase"
-                    value={formMatch.opponent}
-                    onChange={e => setFormMatch({...formMatch, opponent: e.target.value.toUpperCase()})}
+                    value={currentMatch.opponent}
+                    onChange={e => updateMatchInGlobal({...currentMatch, opponent: e.target.value.toUpperCase()})}
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-white/30 ml-2">URL Escudo Rival (Imagem)</label>
+                  <div className="relative">
+                    <ImageIcon size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" />
+                    <input 
+                        type="text" 
+                        placeholder="Link da imagem (https://...)" 
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 pl-12 font-medium outline-none focus:border-[#F4BE02]/50 transition-all text-xs"
+                        value={currentMatch.opponentLogo || ''}
+                        onChange={e => updateMatchInGlobal({...currentMatch, opponentLogo: e.target.value})}
+                    />
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
@@ -340,75 +400,125 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
                     <input 
                       type="date" 
                       className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 font-bold outline-none text-white/60 text-xs"
-                      value={formMatch.date}
-                      onChange={e => setFormMatch({...formMatch, date: e.target.value})}
+                      value={currentMatch.date}
+                      onChange={e => updateMatchInGlobal({...currentMatch, date: e.target.value})}
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[9px] font-black uppercase tracking-widest text-white/30 ml-2">Quadro</label>
-                    <select 
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 font-bold outline-none text-white/60 text-xs appearance-none"
-                      value={formMatch.label}
-                      onChange={e => setFormMatch({...formMatch, label: e.target.value as QuadroType})}
-                    >
-                      <option value="Quadro 1">Quadro 1</option>
-                      <option value="Quadro 2">Quadro 2</option>
-                    </select>
+                     <label className="text-[9px] font-black uppercase tracking-widest text-white/30 ml-2">Tipo de Jogo</label>
+                     <button 
+                        onClick={() => updateMatchInGlobal({...currentMatch, isFriendly: !currentMatch.isFriendly})}
+                        className={`w-full p-4 rounded-2xl border transition-all flex items-center justify-center gap-2 ${currentMatch.isFriendly ? 'bg-[#F4BE02]/10 border-[#F4BE02]/40 text-[#F4BE02]' : 'bg-white/5 border-white/5 text-white/30'}`}
+                      >
+                        <Star size={16} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">{currentMatch.isFriendly ? 'Amistoso' : 'Oficial'}</span>
+                      </button>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                   <button 
-                    onClick={() => setShowRosterModal(true)}
-                    className="p-4 rounded-2xl border border-white/5 bg-white/5 flex flex-col items-center gap-2 group active:scale-95 transition-all"
-                  >
-                    <Users size={18} className="text-[#F4BE02]" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Convocar ({formMatch.roster?.length || 0})</span>
-                  </button>
-                  <button 
-                    onClick={() => {
-                        const val = !formMatch.isFriendly;
-                        setFormMatch({...formMatch, isFriendly: val});
-                    }}
-                    className={`p-4 rounded-2xl border transition-all flex flex-col items-center gap-2 ${formMatch.isFriendly ? 'bg-[#F4BE02]/10 border-[#F4BE02]/40 text-[#F4BE02]' : 'bg-white/5 border-white/5 text-white/30'}`}
-                  >
-                    <Star size={18} />
-                    <span className="text-[10px] font-black uppercase tracking-widest">{formMatch.isFriendly ? 'Amistoso' : 'Oficial'}</span>
-                  </button>
+                <div className="h-px bg-white/5 my-2"></div>
+
+                {/* CAMPOS ESPECÍFICOS */}
+                <div className="flex items-center gap-2 mb-2">
+                    <div className="px-2 py-0.5 rounded bg-[#F4BE02] text-black text-[9px] font-black uppercase tracking-wider">{activeQuadro}</div>
+                    <span className="text-[9px] font-black uppercase text-white/30 tracking-widest">Dados Específicos</span>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[9px] font-black uppercase tracking-widest text-white/30 ml-2">Notas da Partida</label>
+                  <label className="text-[9px] font-black uppercase tracking-widest text-white/30 ml-2">Árbitro do {activeQuadro}</label>
+                  <div className="relative">
+                    <select
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 pl-10 font-bold outline-none focus:border-[#F4BE02]/50 transition-all text-sm uppercase appearance-none text-white"
+                        value={currentMatch.referee || ''}
+                        onChange={e => updateMatchInGlobal({...currentMatch, referee: e.target.value})}
+                    >
+                        <option value="" className="bg-[#0A0A0A] text-white/50">Selecione o Árbitro</option>
+                        {activePlayers.map(p => (
+                                <option key={p.id} value={p.name} className="bg-[#0A0A0A] text-white">
+                                    {p.name}
+                                </option>
+                            ))
+                        }
+                    </select>
+                    <Flag size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 pointer-events-none" />
+                    <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 pointer-events-none" />
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => setShowRosterModal(true)}
+                  className="w-full p-4 rounded-2xl border border-white/5 bg-white/5 flex items-center justify-between group active:scale-95 transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#F4BE02]/10 flex items-center justify-center text-[#F4BE02]">
+                        <Users size={20} />
+                      </div>
+                      <div className="text-left">
+                        <span className="text-[10px] font-black uppercase tracking-widest block text-white/60">Elenco do {activeQuadro}</span>
+                        <span className="text-sm font-bold text-white">{currentMatch.roster?.length || 0} Atletas</span>
+                      </div>
+                  </div>
+                  <ChevronDown size={16} className="text-white/20" />
+                </button>
+
+                <div className="space-y-2">
+                  <label className="text-[9px] font-black uppercase tracking-widest text-white/30 ml-2">Observações ({activeQuadro})</label>
                   <textarea 
-                    rows={3}
+                    rows={2}
                     className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 font-medium outline-none text-xs uppercase"
-                    value={formMatch.notes}
-                    onChange={e => setFormMatch({...formMatch, notes: e.target.value.toUpperCase()})}
+                    value={currentMatch.notes}
+                    onChange={e => updateMatchInGlobal({...currentMatch, notes: e.target.value.toUpperCase()})}
+                    placeholder="W.O., Atrasos, etc."
                   />
                 </div>
               </div>
 
-              <div className="flex gap-3">
-                 <button onClick={() => setShowForm(false)} className="flex-1 py-4 bg-white/5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white/40">Cancelar</button>
-                 <button onClick={handleGoToCampo} className="flex-[2] py-4 bg-[#F4BE02] text-black rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-yellow-500/10">Ir para Campo</button>
+              <div className="flex gap-3 pt-4 border-t border-white/5">
+                 <button onClick={() => setShowForm(false)} className="flex-1 py-4 bg-white/5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white/40">Sair</button>
+                 <button 
+                    onClick={() => setActiveStep('events')} 
+                    disabled={!currentMatch.opponent}
+                    className="flex-[2] py-4 bg-[#F4BE02] text-black rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-yellow-500/10 disabled:opacity-50"
+                 >
+                    Ir para o Jogo
+                 </button>
               </div>
             </div>
           ) : (
             <div className="space-y-6 animate-in slide-in-from-right-4">
-              {/* Placar Real-Time */}
-              <div className="bg-[#111] p-6 rounded-[32px] border border-white/10 flex items-center justify-around relative overflow-hidden">
-                <div className="flex flex-col items-center gap-2 w-24">
-                    <img src="https://i.postimg.cc/tR3cPQZd/100-firula-II-removebg-preview.png" className="w-10 h-10 object-contain" />
-                    <span className="text-[8px] font-black uppercase tracking-widest text-white/40">100 Firula</span>
+              {/* PLACAR REAL-TIME COM ESCUDOS */}
+              <div className="bg-[#111] p-6 rounded-[32px] border border-white/10 relative overflow-hidden">
+                <div className="absolute top-2 left-0 right-0 text-center z-10">
+                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-[#F4BE02] bg-[#F4BE02]/10 px-3 py-1 rounded-full">{activeQuadro}</span>
                 </div>
-                <div className="flex items-center gap-4">
-                    <span className="text-5xl font-display font-bold">{calculateScore(formMatch).us}</span>
-                    <span className="text-xl font-display text-white/20">x</span>
-                    <span className="text-5xl font-display font-bold text-white/40">{calculateScore(formMatch).them}</span>
-                </div>
-                <div className="flex flex-col items-center gap-2 w-24">
-                    <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center"><Trophy size={20} className="text-white/20"/></div>
-                    <span className="text-[8px] font-black uppercase tracking-widest text-white/40 truncate w-full text-center">{formMatch.opponent || 'Oponente'}</span>
+                
+                <div className="flex items-center justify-between mt-4">
+                    {/* Time Casa */}
+                    <div className="flex flex-col items-center gap-3 w-1/3">
+                        <div className="w-20 h-20 rounded-full bg-black border-2 border-[#F4BE02]/20 p-2 shadow-[0_0_20px_rgba(244,190,2,0.1)] flex items-center justify-center">
+                            <img src={HOME_TEAM_LOGO} className="w-full h-full object-contain" />
+                        </div>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-white/60">100 Firula</span>
+                    </div>
+
+                    {/* Placar Central */}
+                    <div className="flex items-center gap-4">
+                        <span className="text-6xl font-display font-bold text-white drop-shadow-xl">{calculateScore(currentMatch).us}</span>
+                        <div className="h-8 w-[1px] bg-white/10 rotate-12"></div>
+                        <span className="text-6xl font-display font-bold text-white/40 drop-shadow-xl">{calculateScore(currentMatch).them}</span>
+                    </div>
+
+                    {/* Time Rival */}
+                    <div className="flex flex-col items-center gap-3 w-1/3">
+                        <div className="w-20 h-20 rounded-full bg-black border-2 border-white/10 p-2 shadow-lg flex items-center justify-center overflow-hidden">
+                            {currentMatch.opponentLogo ? (
+                                <img src={currentMatch.opponentLogo} className="w-full h-full object-contain" />
+                            ) : (
+                                <Trophy size={32} className="text-white/20"/>
+                            )}
+                        </div>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-white/60 truncate w-full text-center">{currentMatch.opponent || 'Oponente'}</span>
+                    </div>
                 </div>
               </div>
 
@@ -430,7 +540,7 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
                        <span className="text-[8px] font-black uppercase text-red-500/60">Gols Sofridos</span>
                        <div className="flex items-center gap-4">
                           <button onClick={() => updateOpponentStats('opponentGoals', -1)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center border border-white/10"><Minus size={12}/></button>
-                          <span className="text-2xl font-display font-bold">{formMatch.stats![currentTempo === 1 ? 'tempo1' : 'tempo2'].opponentGoals || 0}</span>
+                          <span className="text-2xl font-display font-bold">{currentMatch.stats![currentTempo === 1 ? 'tempo1' : 'tempo2'].opponentGoals || 0}</span>
                           <button onClick={() => updateOpponentStats('opponentGoals', 1)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center border border-white/10"><Plus size={12}/></button>
                        </div>
                     </div>
@@ -438,7 +548,7 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
                        <span className="text-[8px] font-black uppercase text-yellow-500/60">Faltas Deles</span>
                        <div className="flex items-center gap-4">
                           <button onClick={() => updateOpponentStats('opponentFouls', -1)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center border border-white/10"><Minus size={12}/></button>
-                          <span className="text-2xl font-display font-bold">{formMatch.stats![currentTempo === 1 ? 'tempo1' : 'tempo2'].opponentFouls || 0}</span>
+                          <span className="text-2xl font-display font-bold">{currentMatch.stats![currentTempo === 1 ? 'tempo1' : 'tempo2'].opponentFouls || 0}</span>
                           <button onClick={() => updateOpponentStats('opponentFouls', 1)} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center border border-white/10"><Plus size={12}/></button>
                        </div>
                     </div>
@@ -448,7 +558,7 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
                     <span className="text-[8px] font-black uppercase text-green-500/60 tracking-widest">Nossas Faltas (Time)</span>
                     <div className="flex items-center gap-8">
                        <button onClick={() => updateFouls(-1)} className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10"><Minus size={16}/></button>
-                       <span className="text-4xl font-display font-bold">{formMatch.stats![currentTempo === 1 ? 'tempo1' : 'tempo2'].fouls || 0}</span>
+                       <span className="text-4xl font-display font-bold">{currentMatch.stats![currentTempo === 1 ? 'tempo1' : 'tempo2'].fouls || 0}</span>
                        <button onClick={() => updateFouls(1)} className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10"><Plus size={16}/></button>
                     </div>
                  </div>
@@ -456,19 +566,18 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
 
               {/* Lançamento por Atleta - Layout Horizontal Scroll */}
               <div className="space-y-4">
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-white/30 ml-2">Lançamento por Atleta</h4>
-                {formMatch.roster?.length === 0 ? (
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-white/30 ml-2">Lançamento por Atleta ({activeQuadro})</h4>
+                {currentMatch.roster?.length === 0 ? (
                   <div className="bg-white/5 border border-dashed border-white/10 p-10 rounded-[32px] text-center">
-                    <p className="text-[10px] font-black uppercase text-white/20">Nenhum atleta convocado</p>
+                    <p className="text-[10px] font-black uppercase text-white/20">Nenhum atleta convocado para o {activeQuadro}</p>
+                    <button onClick={() => { setActiveStep('info'); setShowRosterModal(true); }} className="mt-4 px-4 py-2 bg-white/10 rounded-xl text-[9px] font-bold uppercase hover:bg-white/20">Convocar Agora</button>
                   </div>
                 ) : (
-                  formMatch.roster?.map(pid => {
+                  currentMatch.roster?.map(pid => {
                     const player = players.find(p => p.id === pid);
                     
-                    // Lógica para mostrar GOLS, CARTÕES e ASSISTÊNCIAS independente do tempo
-                    // SOMENTE FALTAS respeitam o tempo atual
-                    const t1Events = formMatch.stats!.tempo1.events.filter(e => e.playerId === pid);
-                    const t2Events = formMatch.stats!.tempo2.events.filter(e => e.playerId === pid);
+                    const t1Events = currentMatch.stats!.tempo1.events.filter(e => e.playerId === pid);
+                    const t2Events = currentMatch.stats!.tempo2.events.filter(e => e.playerId === pid);
 
                     const pEventsAccumulated = [
                       ...t1Events.filter(e => e.type !== 'FALTA' || currentTempo === 1),
@@ -481,7 +590,7 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
                            <div className="flex items-center gap-3 shrink-0">
                              <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center font-bold text-sm border border-white/5 text-white/40 relative">
                                 {player?.name?.charAt(0)}
-                                {formMatch.coach === player?.name && (
+                                {currentMatch.coach === player?.name && (
                                     <div className="absolute -top-1 -right-1 w-5 h-5 bg-[#F4BE02] rounded-full flex items-center justify-center border-2 border-[#0A0A0A]">
                                         <UserCog size={10} className="text-black" />
                                     </div>
@@ -489,7 +598,7 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
                              </div>
                              <div className="flex flex-col">
                                 <span className="font-bold text-sm block tracking-tight uppercase leading-tight">{player?.name}</span>
-                                <span className="text-[8px] font-black uppercase text-white/20 tracking-widest">{player?.position} {formMatch.coach === player?.name ? '(TÉCNICO)' : ''}</span>
+                                <span className="text-[8px] font-black uppercase text-white/20 tracking-widest">{player?.position} {currentMatch.coach === player?.name ? '(TÉCNICO)' : ''}</span>
                              </div>
                            </div>
                            <div className="flex gap-1.5 overflow-x-auto scrollbar-hide py-1 flex-1 justify-end min-w-0">
@@ -519,110 +628,134 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
                 )}
               </div>
 
-              <button 
-                onClick={() => setShowForm(false)}
-                className="w-full bg-[#F4BE02] text-black font-black py-5 rounded-[24px] uppercase tracking-widest shadow-xl shadow-yellow-500/20 active:scale-[0.98] transition-all"
-              >
-                Concluir e Voltar
-              </button>
+              <div className="pt-6 border-t border-white/5">
+                <button 
+                  onClick={() => setShowForm(false)}
+                  className="w-full bg-[#F4BE02] text-black font-black py-5 rounded-[24px] uppercase tracking-widest shadow-xl shadow-yellow-500/20 active:scale-[0.98] transition-all"
+                >
+                  Concluir Partida
+                </button>
+              </div>
             </div>
           )}
         </div>
       ) : (
         <div className="space-y-6 animate-in fade-in duration-500">
            
-           {/* FILTROS DE PESQUISA (SÓ APARECE QUANDO FORM ESTÁ FECHADO) */}
+           {/* FILTROS DE PESQUISA */}
            <div className="bg-[#0A0A0A] p-4 rounded-3xl border border-white/5 space-y-3">
              <div className="flex items-center gap-2 px-1">
                 <Filter size={14} className="text-[#F4BE02]" />
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Filtros de Súmula</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Filtros de Rodada</span>
              </div>
-             <div className="grid grid-cols-2 gap-2">
-                <div className="relative">
-                    <select 
-                        value={filterYear} 
-                        onChange={e => setFilterYear(e.target.value)}
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-4 pr-10 text-[10px] font-black uppercase tracking-widest appearance-none outline-none focus:border-[#F4BE02]/50 transition-all text-white"
-                    >
-                        {availableYears.map(y => <option key={y} value={y} className="text-black bg-white">{y}</option>)}
-                    </select>
-                    <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 pointer-events-none" />
-                </div>
-                <div className="relative">
-                    <select 
-                        value={filterQuadro} 
-                        onChange={e => setFilterQuadro(e.target.value)}
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-4 pr-10 text-[10px] font-black uppercase tracking-widest appearance-none outline-none focus:border-[#F4BE02]/50 transition-all text-white"
-                    >
-                        <option value="Todos" className="text-black bg-white">Todos</option>
-                        {availableQuadros.map(q => <option key={q} value={q} className="text-black bg-white">{q}</option>)}
-                    </select>
-                    <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 pointer-events-none" />
-                </div>
+             
+             {/* CAMPO DE BUSCA */}
+             <div className="relative">
+                <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" />
+                <input 
+                    type="text" 
+                    placeholder="BUSCAR ADVERSÁRIO..." 
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-10 pr-4 text-[10px] font-black uppercase tracking-widest outline-none focus:border-[#F4BE02]/50 transition-all text-white placeholder:text-white/20"
+                />
+             </div>
+
+             <div className="relative">
+                <select 
+                    value={filterYear} 
+                    onChange={e => setFilterYear(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-4 pr-10 text-[10px] font-black uppercase tracking-widest appearance-none outline-none focus:border-[#F4BE02]/50 transition-all text-white"
+                >
+                    {availableYears.map(y => <option key={y} value={y} className="text-black bg-white">{y}</option>)}
+                </select>
+                <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 pointer-events-none" />
              </div>
            </div>
 
            {groupedMatches.length > 0 ? groupedMatches.map(([date, dayMatches]) => {
+             // O "Adversário" é comum, pegamos do primeiro jogo
+             const opponent = dayMatches[0]?.opponent || 'Adversário';
+             const isFriendly = dayMatches[0]?.isFriendly;
+             
              return (
                <div key={date} className="space-y-4">
-                  <div className="flex items-center gap-3 px-1">
-                    <Calendar size={14} className="text-[#F4BE02]/50" />
-                    <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">
-                      {new Date(date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
-                    </span>
+                  <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-3">
+                        <Calendar size={14} className="text-[#F4BE02]/50" />
+                        <span className="text-[10px] font-black text-white/30 uppercase tracking-[0.2em]">
+                        {new Date(date + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                        </span>
+                    </div>
+                    {isFriendly && (
+                        <span className="text-[8px] font-black bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded uppercase tracking-widest border border-blue-500/20">Amistoso</span>
+                    )}
                   </div>
-                  <div className="grid gap-4">
-                     {dayMatches.map(m => {
-                       const score = calculateScore(m);
-                       const mvp = getMVP(m);
-                       return (
-                         <div key={m.id} className="bg-[#0A0A0A] rounded-[32px] border border-white/[0.06] overflow-hidden group hover:border-white/20 transition-all shadow-xl">
-                            <div className="p-4 flex justify-between items-center bg-white/[0.02] border-b border-white/[0.04]">
-                               <div className="flex items-center gap-3">
-                                  <div className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 text-[8px] font-black text-white/50 uppercase tracking-widest">{m.label}</div>
-                                  {m.isFriendly && <div className="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-[8px] font-black text-blue-500 uppercase tracking-widest">Amistoso</div>}
-                               </div>
-                               <div className="flex gap-2">
-                                  <button onClick={() => setRatingMatchId(m.id)} className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-white/30 hover:text-[#F4BE02] transition-all active:scale-90"><Star size={16}/></button>
-                                  <button onClick={() => handleEditMatch(m)} className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center text-white/30 hover:text-white transition-all active:scale-90"><Pencil size={16}/></button>
-                               </div>
-                            </div>
-                            
-                            <div className="p-8 flex items-center justify-between relative overflow-hidden">
-                               <div className="flex flex-col items-center gap-2 w-24 text-center">
-                                  <div className="w-14 h-14 rounded-full bg-black border border-[#F4BE02]/30 p-2 shadow-2xl relative">
-                                    <img src="https://i.postimg.cc/tR3cPQZd/100-firula-II-removebg-preview.png" className="w-full h-full object-contain" />
-                                  </div>
-                                  <span className="text-[9px] font-black uppercase text-white/80 tracking-widest">100 Firula</span>
-                               </div>
+                  
+                  <div className="bg-[#0A0A0A] rounded-[32px] border border-white/[0.06] overflow-hidden p-2 space-y-2">
+                     <div className="px-4 py-2 flex items-center justify-between">
+                         <h3 className="text-sm font-display font-bold uppercase tracking-tight text-white/80">vs {opponent}</h3>
+                         <button 
+                            onClick={() => handleEditMatchGroup(dayMatches[0])} 
+                            className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-white hover:bg-white/10"
+                         >
+                            <Pencil size={14}/>
+                         </button>
+                     </div>
+                     
+                     {/* Lista os Jogos do Dia */}
+                     {dayMatches.sort((a,b) => b.label.localeCompare(a.label)).map(m => { 
+                        const score = calculateScore(m);
+                        const mvpPlayer = getMVP(m);
+                        
+                        return (
+                            <div key={m.id} className="bg-white/[0.02] rounded-2xl border border-white/5 p-4 flex flex-col gap-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3 w-24">
+                                        <div className="w-8 h-8 rounded-full bg-black border border-[#F4BE02]/30 p-0.5">
+                                            <img src={HOME_TEAM_LOGO} className="w-full h-full object-contain" />
+                                        </div>
+                                        <span className="text-[9px] font-black uppercase tracking-widest text-[#F4BE02]">{m.label}</span>
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-4">
+                                        <span className="text-xl font-display font-bold">{score.us}</span>
+                                        <span className="text-xs text-white/20">x</span>
+                                        <span className="text-xl font-display font-bold text-white/40">{score.them}</span>
+                                    </div>
 
-                               <div className="flex flex-col items-center">
-                                  <div className="flex items-center gap-6">
-                                    <span className="text-5xl font-display font-bold text-white leading-none">{score.us}</span>
-                                    <div className="h-10 w-[1px] bg-white/10"></div>
-                                    <span className="text-5xl font-display font-bold text-white/20 leading-none">{score.them}</span>
-                                  </div>
-                               </div>
-
-                               <div className="flex flex-col items-center gap-2 w-24 text-center">
-                                  <div className="w-14 h-14 rounded-full bg-[#111] border border-white/10 flex items-center justify-center shadow-2xl">
-                                    <Trophy size={24} className="text-white/10" />
-                                  </div>
-                                  <span className="text-[9px] font-black uppercase text-white/30 tracking-widest truncate w-full">{m.opponent}</span>
-                               </div>
-                            </div>
-
-                            {mvp && (
-                              <div className="px-6 py-4 border-t border-white/[0.03] flex items-center justify-between bg-[#F4BE02]/5">
-                                <div className="flex items-center gap-2">
-                                    <Crown size={14} className="text-[#F4BE02]" />
-                                    <span className="text-[9px] font-bold text-white/60 uppercase tracking-widest">Craque do Jogo</span>
+                                    <div className="flex items-center justify-end gap-3 w-24">
+                                        {m.opponentLogo ? (
+                                            <div className="w-8 h-8 rounded-full bg-black border border-white/10 p-0.5">
+                                                <img src={m.opponentLogo} className="w-full h-full object-contain" />
+                                            </div>
+                                        ) : (
+                                            <Trophy size={16} className="text-white/20"/>
+                                        )}
+                                        <button onClick={() => setRatingMatchId(m.id)} className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/20 hover:text-[#F4BE02]">
+                                            <Star size={14} />
+                                        </button>
+                                    </div>
                                 </div>
-                                <span className="text-[10px] font-black text-[#F4BE02] uppercase tracking-widest">{mvp}</span>
-                              </div>
-                            )}
-                         </div>
-                       )
+
+                                {(mvpPlayer || m.coach || m.referee) && (
+                                    <div className="grid grid-cols-3 gap-2 border-t border-white/5 pt-3">
+                                       <div className="flex flex-col gap-1">
+                                          <span className="text-[7px] font-black uppercase text-[#F4BE02] flex items-center gap-1"><Crown size={8}/> Craque</span>
+                                          <span className="text-[9px] font-bold text-white truncate">{mvpPlayer || '-'}</span>
+                                       </div>
+                                       <div className="flex flex-col gap-1 border-l border-white/5 pl-2">
+                                          <span className="text-[7px] font-black uppercase text-white/30 flex items-center gap-1"><UserCog size={8}/> Técnico</span>
+                                          <span className="text-[9px] font-bold text-white truncate">{m.coach || '-'}</span>
+                                       </div>
+                                       <div className="flex flex-col gap-1 border-l border-white/5 pl-2">
+                                          <span className="text-[7px] font-black uppercase text-white/30 flex items-center gap-1"><Flag size={8}/> Árbitro</span>
+                                          <span className="text-[9px] font-bold text-white truncate">{m.referee || '-'}</span>
+                                       </div>
+                                    </div>
+                                )}
+                            </div>
+                        )
                      })}
                   </div>
                </div>
@@ -630,20 +763,20 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
            }) : (
              <div className="text-center py-24 opacity-10 flex flex-col items-center gap-4">
                 <Trophy size={80} strokeWidth={0.5} />
-                <p className="text-[10px] font-black uppercase tracking-[0.4em]">Sem Jogos Registrados para este filtro</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.4em]">Nenhuma rodada encontrada</p>
              </div>
            )}
         </div>
       )}
 
-      {/* Modal de Convocação */}
-      {showRosterModal && (
+      {/* MODAL DE CONVOCAÇÃO */}
+      {showRosterModal && currentMatch && (
         <div className="fixed inset-0 z-[120] bg-black/95 backdrop-blur-xl flex items-end sm:items-center justify-center animate-in fade-in duration-500 p-4">
            <div className="w-full max-w-md bg-[#0A0A0A] border border-white/10 rounded-[40px] h-[85vh] flex flex-col shadow-2xl overflow-hidden">
               <div className="p-8 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
                 <div>
-                  <h3 className="text-2xl font-display font-bold uppercase tracking-tight">CONVOCAÇÃO</h3>
-                  <p className="text-[10px] font-black text-[#F4BE02] uppercase tracking-widest">Quem entrou em campo?</p>
+                  <h3 className="text-2xl font-display font-bold uppercase tracking-tight">ELENCO DO {activeQuadro}</h3>
+                  <p className="text-[10px] font-black text-[#F4BE02] uppercase tracking-widest">Seleção de Atletas</p>
                 </div>
                 <button onClick={() => setShowRosterModal(false)} className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-white/40 active:scale-90 transition-transform"><X size={24}/></button>
               </div>
@@ -659,16 +792,13 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
                     </div>
                     <span className="font-bold text-sm uppercase tracking-widest">SELECIONAR TODOS</span>
                   </div>
-                  <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${(formMatch.roster?.length || 0) === players.filter(p => p.active !== false).length ? 'bg-[#F4BE02] border-[#F4BE02] text-black' : 'border-white/10'}`}>
-                    {(formMatch.roster?.length || 0) === players.filter(p => p.active !== false).length && <Check size={14} strokeWidth={4} />}
-                  </div>
                 </button>
 
                 <div className="h-4"></div>
 
-                {players.filter(p => p.active !== false).sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(p => {
-                  const isSelected = formMatch.roster?.includes(p.id);
-                  const isCoach = formMatch.coach === p.name;
+                {activePlayers.map(p => {
+                  const isSelected = currentMatch.roster?.includes(p.id);
+                  const isCoach = currentMatch.coach === p.name;
 
                   return (
                     <div 
@@ -678,16 +808,9 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
                       <button 
                         className="flex-1 flex items-center gap-4 text-left"
                         onClick={() => {
-                            setFormMatch(prev => {
-                                const roster = prev.roster || [];
-                                const updatedRoster = roster.includes(p.id) 
-                                    ? roster.filter(id => id !== p.id) 
-                                    : [...roster, p.id];
-                                
-                                const updated = { ...prev, roster: updatedRoster };
-                                syncMatchToGlobal(updated);
-                                return updated;
-                            });
+                            const roster = currentMatch.roster || [];
+                            const updatedRoster = roster.includes(p.id) ? roster.filter(id => id !== p.id) : [...roster, p.id];
+                            updateMatchInGlobal({ ...currentMatch, roster: updatedRoster });
                         }}
                       >
                          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-lg transition-colors ${isSelected ? 'bg-[#F4BE02] text-black shadow-lg shadow-yellow-500/20' : 'bg-white/5'}`}>{p.name?.charAt(0)}</div>
@@ -700,35 +823,17 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
                       </button>
 
                       <div className="flex items-center gap-3">
-                        {/* Botão de Selecionar Técnico */}
                         <button 
-                            onClick={() => {
-                                setFormMatch(prev => {
-                                    const coachName = prev.coach === p.name ? '' : p.name;
-                                    const updated = { ...prev, coach: coachName };
-                                    syncMatchToGlobal(updated);
-                                    return updated;
-                                });
-                            }}
-                            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all border ${isCoach ? 'bg-[#F4BE02] border-[#F4BE02] text-black shadow-lg shadow-yellow-500/30' : 'bg-white/5 border-white/10 text-white/20'}`}
-                            title="Marcar como Técnico"
+                            onClick={() => updateMatchInGlobal({ ...currentMatch, coach: currentMatch.coach === p.name ? '' : p.name })}
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all border ${isCoach ? 'bg-[#F4BE02] border-[#F4BE02] text-black shadow-lg' : 'bg-white/5 border-white/10 text-white/20'}`}
                         >
                             <UserCog size={18} />
                         </button>
-                        
-                        {/* Checkbox de Convocação */}
                         <button 
                             onClick={() => {
-                                setFormMatch(prev => {
-                                    const roster = prev.roster || [];
-                                    const updatedRoster = roster.includes(p.id) 
-                                        ? roster.filter(id => id !== p.id) 
-                                        : [...roster, p.id];
-                                    
-                                    const updated = { ...prev, roster: updatedRoster };
-                                    syncMatchToGlobal(updated);
-                                    return updated;
-                                });
+                                const roster = currentMatch.roster || [];
+                                const updatedRoster = roster.includes(p.id) ? roster.filter(id => id !== p.id) : [...roster, p.id];
+                                updateMatchInGlobal({ ...currentMatch, roster: updatedRoster });
                             }}
                             className={`w-10 h-10 rounded-xl border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-[#F4BE02] border-[#F4BE02] text-black' : 'border-white/10'}`}
                         >
@@ -746,53 +851,84 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
         </div>
       )}
 
-      {/* Modal de Notas */}
+      {/* MODAL DE NOTAS COM MÚLTIPLOS AVALIADORES */}
       {ratingMatchId && (
         <div className="fixed inset-0 z-[120] bg-black/95 backdrop-blur-xl flex items-end sm:items-center justify-center p-4">
            <div className="w-full max-w-md bg-[#0A0A0A] border border-white/10 rounded-[40px] h-[85vh] flex flex-col shadow-2xl overflow-hidden">
-              <div className="p-8 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
-                <div>
-                  <h3 className="text-2xl font-display font-bold text-white uppercase tracking-tight">NOTAS DO JOGO</h3>
-                  <p className="text-[10px] uppercase tracking-widest text-[#F4BE02] font-black">Avaliação Individual</p>
-                </div>
-                <button onClick={() => setRatingMatchId(null)} className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-white/40 active:scale-90 transition-transform"><X size={24}/></button>
-              </div>
-              <div className="flex-1 overflow-y-auto p-6 space-y-3">
-                {players.filter(p => matches.find(m => m.id === ratingMatchId)?.roster?.includes(p.id)).map(p => {
-                  const rating = (tempRatings[p.id] || (matches.find(m => m.id === ratingMatchId)?.playerRatings?.[p.id]) || 0);
-                  return (
-                    <div key={p.id} className="p-5 rounded-[28px] bg-white/[0.02] border border-white/5 flex items-center justify-between transition-all hover:bg-white/[0.04]">
-                       <div>
-                            <span className="font-bold text-sm block tracking-tight uppercase">{p.name}</span>
-                            <span className="text-[8px] font-black uppercase text-white/20 tracking-widest">{p.position}</span>
-                       </div>
-                       <div className="flex items-center gap-4">
-                         <button onClick={() => {
-                           const newVal = Math.max(0, rating - 0.5);
-                           setTempRatings({...tempRatings, [p.id]: newVal});
-                         }} className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 active:scale-90 transition-transform"><Minus size={16}/></button>
-                         <div className={`w-14 text-center font-display font-bold text-xl ${rating >= 8 ? 'text-green-500' : rating >= 6 ? 'text-[#F4BE02]' : 'text-white/40'}`}>
-                            {rating.toFixed(1)}
-                         </div>
-                         <button onClick={() => {
-                           const newVal = Math.min(10, rating + 0.5);
-                           setTempRatings({...tempRatings, [p.id]: newVal});
-                         }} className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 active:scale-90 transition-transform"><Plus size={16}/></button>
-                       </div>
+              <div className="p-8 border-b border-white/5 bg-white/[0.02] space-y-4">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h3 className="text-2xl font-display font-bold text-white uppercase tracking-tight">NOTAS</h3>
+                        <p className="text-[10px] uppercase tracking-widest text-[#F4BE02] font-black">Avaliação Individual</p>
                     </div>
-                  )
-                })}
+                    <button onClick={() => { setRatingMatchId(null); setCurrentEvaluatorId(''); }} className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center text-white/40 active:scale-90 transition-transform"><X size={24}/></button>
+                </div>
+                
+                {/* SELETOR DE AVALIADOR */}
+                <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[#F4BE02]">
+                        <UserCheck size={16} />
+                    </div>
+                    <select
+                        value={currentEvaluatorId}
+                        onChange={(e) => setCurrentEvaluatorId(e.target.value)}
+                        className="w-full bg-[#111] border border-[#F4BE02]/30 rounded-2xl py-4 pl-12 pr-10 text-sm font-bold uppercase text-white outline-none focus:border-[#F4BE02] appearance-none"
+                    >
+                        <option value="">Quem está avaliando?</option>
+                        {activePlayers.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                    </select>
+                    <ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 pointer-events-none" />
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 space-y-3">
+                {!currentEvaluatorId ? (
+                    <div className="flex flex-col items-center justify-center h-full opacity-30 gap-4">
+                        <UserCheck size={48} />
+                        <p className="text-xs font-black uppercase tracking-widest text-center">Selecione um avaliador<br/>para começar</p>
+                    </div>
+                ) : (
+                    players.filter(p => matches.find(m => m.id === ratingMatchId)?.roster?.includes(p.id)).map(p => {
+                        // Nota específica deste avaliador
+                        const myRating = getMyRatingForPlayer(p.id);
+                        
+                        // Média Geral
+                        const average = matches.find(m => m.id === ratingMatchId)?.playerRatings?.[p.id] || 0;
+
+                        return (
+                            <div key={p.id} className="p-5 rounded-[28px] bg-white/[0.02] border border-white/5 flex items-center justify-between transition-all hover:bg-white/[0.04]">
+                                <div>
+                                    <span className="font-bold text-sm block tracking-tight uppercase">{p.name}</span>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-[8px] font-black uppercase text-white/20 tracking-widest">{p.position}</span>
+                                        {average > 0 && (
+                                            <span className="text-[8px] font-black uppercase text-[#F4BE02] tracking-widest bg-[#F4BE02]/10 px-1.5 py-0.5 rounded">Média: {average.toFixed(1)}</span>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <button onClick={() => handleRatePlayer(p.id, Math.max(0, myRating - 0.5))} className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 active:scale-90 transition-transform"><Minus size={16}/></button>
+                                    <div className={`w-12 text-center font-display font-bold text-xl ${myRating >= 8 ? 'text-green-500' : myRating >= 6 ? 'text-[#F4BE02]' : 'text-white/40'}`}>
+                                        {myRating.toFixed(1)}
+                                    </div>
+                                    <button onClick={() => handleRatePlayer(p.id, Math.min(10, myRating + 0.5))} className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center border border-white/10 active:scale-90 transition-transform"><Plus size={16}/></button>
+                                </div>
+                            </div>
+                        )
+                    })
+                )}
               </div>
               <div className="p-8 bg-white/[0.02] border-t border-white/5">
                 <button 
                   onClick={() => {
-                    setMatches(prev => prev.map(m => m.id === ratingMatchId ? { ...m, playerRatings: { ...m.playerRatings, ...tempRatings } } : m));
                     setRatingMatchId(null);
-                    setTempRatings({});
+                    setCurrentEvaluatorId('');
                   }}
                   className="w-full py-5 bg-[#F4BE02] text-black rounded-3xl font-black uppercase tracking-[0.2em] shadow-2xl active:scale-[0.98] transition-all"
                 >
-                  Confirmar Notas
+                  Concluir Notas
                 </button>
               </div>
            </div>

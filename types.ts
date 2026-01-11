@@ -42,17 +42,25 @@ export interface QuadroStats {
   tempo2: HalfStats;
 }
 
+export interface RatingDetail {
+  evaluatorId: string;
+  score: number;
+}
+
 export interface Match {
   id: string;
   date: string;
   opponent: string;
+  opponentLogo?: string;
   label: 'Quadro 1' | 'Quadro 2';
   stats: QuadroStats;
   notes: string;
   coach?: string;
+  referee?: string;
   isFriendly?: boolean;
   wo?: 'none' | 'win' | 'loss';
-  playerRatings?: Record<string, number>;
+  playerRatings?: Record<string, number>; // Mantém a média para compatibilidade rápida
+  detailedRatings?: Record<string, RatingDetail[]>; // Novo: Detalhes por avaliador
   roster?: string[];
 }
 
@@ -61,7 +69,7 @@ export interface Payment {
   month: string;
   status: 'Pago' | 'Pendente';
   value: number;
-  paymentDate?: string; // Novo campo para data do pagamento
+  paymentDate?: string;
 }
 
 export interface Expense {

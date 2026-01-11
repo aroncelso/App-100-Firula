@@ -1,7 +1,7 @@
 
 /**
- * 100 FIRULA SOCIETY - DATABASE ENGINE v17.0 (PT-BR HEADERS FIXED)
- * Garante cabeçalhos em Português e estrutura de 4 colunas no financeiro.
+ * 100 FIRULA SOCIETY - DATABASE ENGINE v18.0 (WITH PLAYER NAMES)
+ * Garante cabeçalhos em Português e inclui NOME ATLETA ao lado do ID.
  */
 
 // CONFIGURAÇÃO DOS CABEÇALHOS (PT-BR OBRIGATÓRIO)
@@ -15,18 +15,20 @@ const CONFIG = {
     'GOLS PRÓ', 'GOLS CONTRA', 
     'FALTAS TIME T1', 'FALTAS TIME T2', 
     'GOLS ADVERSÁRIO T1', 'GOLS ADVERSÁRIO T2', 
-    'FALTAS ADVERSÁRIO T1', 'FALTAS ADVERSÁRIO T2'
+    'FALTAS ADVERSÁRIO T1', 'FALTAS ADVERSÁRIO T2',
+    'ÁRBITRO', 'LOGO RIVAL'
   ],
+  // ADICIONADO: NOME ATLETA (Índice 2)
   'LANCAMENTOS_ATLETAS': [
-    'ID PARTIDA', 'ID ATLETA', 'GOLS', 'ASSISTÊNCIAS', 'AMARELO', 'VERMELHO', 
-    'FALTAS', 'GOL CONTRA', 'PÊNALTI SOFRIDO', 'PÊNALTI COMETIDO', 'PÊNALTI PERDIDO', 'NOTA'
+    'ID PARTIDA', 'ID ATLETA', 'NOME ATLETA', 'GOLS', 'ASSISTÊNCIAS', 'AMARELO', 'VERMELHO', 
+    'FALTAS', 'GOL CONTRA', 'PÊNALTI SOFRIDO', 'PÊNALTI COMETIDO', 'PÊNALTI PERDIDO', 'NOTA MÉDIA', 'DETALHES_AVALIACAO'
   ],
   'DESPESAS': [
     'ID', 'DATA', 'DESCRIÇÃO', 'VALOR', 'CATEGORIA'
   ],
-  // FINANCEIRO SIMPLIFICADO (4 COLUNAS)
+  // ADICIONADO: NOME ATLETA (Índice 1)
   'MENSALIDADES': [
-    'ID ATLETA', 'STATUS', 'VALOR', 'DATA PAGAMENTO'
+    'ID ATLETA', 'NOME ATLETA', 'STATUS', 'VALOR', 'DATA PAGAMENTO'
   ],
   'REGRAS_CARTOLA': [
     'ID', 'RÓTULO', 'CATEGORIA', 'VALOR', 'ATIVO', 'TIPO'
@@ -42,27 +44,15 @@ function getOrCreateSheet(name) {
     sheet = ss.insertSheet(name);
   }
 
-  // GARANTIA DE CABEÇALHO EM PORTUGUÊS
+  // ATUALIZAÇÃO FORÇADA DE CABEÇALHOS
   if (headers && headers.length > 0) {
-    const lastRow = sheet.getLastRow();
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.setFrozenRows(1);
     
-    // Verifica se a planilha está vazia ou se a primeira célula está vazia
-    // Se sim, escreve os cabeçalhos em PT-BR
-    var needsHeaders = lastRow === 0;
-    if (!needsHeaders) {
-       var firstCell = sheet.getRange(1, 1).getValue();
-       if (firstCell === "") needsHeaders = true;
-    }
-
-    if (needsHeaders) {
-      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-      sheet.setFrozenRows(1);
-      // Aplica a cor do logo (#F4BE02) e negrito
-      sheet.getRange(1, 1, 1, headers.length)
-           .setFontWeight("bold")
-           .setBackground("#F4BE02")
-           .setBorder(true, true, true, true, null, null);
-    }
+    sheet.getRange(1, 1, 1, headers.length)
+         .setFontWeight("bold")
+         .setBackground(null)
+         .setBorder(true, true, true, true, null, null);
   }
   return sheet;
 }
@@ -95,7 +85,7 @@ function doGet() {
     if (sheetMatches.getLastRow() > 1) {
       sheetMatches.getDataRange().getValues().slice(1).forEach(row => {
         if (!row[0]) return;
-        result.PARTIDAS.push({ id: row[0].toString(), data: formatDate(row[1]), adversario: row[2], quadro: row[3], tecnico: row[4], amistoso: row[5], wo: row[6], notes: row[7], golsPro: row[8], golsContra: row[9], faltasTimeT1: row[10], faltasTimeT2: row[11], golsAdversarioT1: row[12], golsAdversarioT2: row[13], faltasAdversarioT1: row[14], faltasAdversarioT2: row[15] });
+        result.PARTIDAS.push({ id: row[0].toString(), data: formatDate(row[1]), adversario: row[2], quadro: row[3], tecnico: row[4], amistoso: row[5], wo: row[6], notes: row[7], golsPro: row[8], golsContra: row[9], faltasTimeT1: row[10], faltasTimeT2: row[11], golsAdversarioT1: row[12], golsAdversarioT2: row[13], faltasAdversarioT1: row[14], faltasAdversarioT2: row[15], arbitro: row[16], logo: row[17] });
       });
     }
 
@@ -103,7 +93,23 @@ function doGet() {
     if (sheetL.getLastRow() > 1) {
       sheetL.getDataRange().getValues().slice(1).forEach(row => {
         if (!row[0]) return;
-        result.LANCAMENTOS_ATLETAS.push({ idPartida: row[0].toString(), idAtleta: row[1].toString(), gols: Number(row[2]) || 0, assistencias: Number(row[3]) || 0, amarelo: Number(row[4]) || 0, vermelho: Number(row[5]) || 0, faltas: Number(row[6]) || 0, golContra: Number(row[7]) || 0, pSofri: Number(row[8]) || 0, pCometi: Number(row[9]) || 0, pPerd: Number(row[10]) || 0, nota: Number(row[11]) || 0 });
+        // ÍNDICES AJUSTADOS DEVIDO À NOVA COLUNA 'NOME ATLETA' (row[2])
+        result.LANCAMENTOS_ATLETAS.push({ 
+            idPartida: row[0].toString(), 
+            idAtleta: row[1].toString(),
+            // row[2] é o Nome, ignoramos na leitura do app pois o app já tem os nomes via JOGADORES
+            gols: Number(row[3]) || 0, 
+            assistencias: Number(row[4]) || 0, 
+            amarelo: Number(row[5]) || 0, 
+            vermelho: Number(row[6]) || 0, 
+            faltas: Number(row[7]) || 0, 
+            golContra: Number(row[8]) || 0, 
+            pSofri: Number(row[9]) || 0, 
+            pCometi: Number(row[10]) || 0, 
+            pPerd: Number(row[11]) || 0, 
+            nota: Number(row[12]) || 0,
+            detalhesNota: row[13] ? row[13].toString() : "" 
+        });
       });
     }
 
@@ -119,11 +125,13 @@ function doGet() {
     if (sheetPayments.getLastRow() > 1) {
       sheetPayments.getDataRange().getValues().slice(1).forEach(row => {
         if (!row[0]) return;
+        // ÍNDICES AJUSTADOS DEVIDO À NOVA COLUNA 'NOME ATLETA' (row[1])
         result.PAYMENTS.push({ 
-          playerId: row[0].toString(), 
-          status: row[1] ? row[1].toString() : "Pendente", 
-          value: Number(row[2]) || 0, 
-          paymentDate: formatDate(row[3]) 
+          playerId: row[0].toString(),
+          // row[1] é Nome
+          status: row[2] ? row[2].toString() : "Pendente", 
+          value: Number(row[3]) || 0, 
+          paymentDate: formatDate(row[4]) 
         });
       });
     }
@@ -150,10 +158,9 @@ function doPost(e) {
     const allData = payload.data;
     
     const syncSheet = (name, dataRows) => {
-      const sheet = getOrCreateSheet(name); // Garante que o cabeçalho PT-BR exista
+      const sheet = getOrCreateSheet(name);
       const headers = CONFIG[name];
       
-      // Limpa dados a partir da linha 2, preservando o cabeçalho
       if (sheet.getLastRow() > 1) {
         sheet.getRange(2, 1, sheet.getLastRow() - 1, headers.length).clearContent();
       }
@@ -165,14 +172,41 @@ function doPost(e) {
     };
 
     syncSheet('JOGADORES', allData.PLAYERS.map(p => [p.id, p.name, p.position, p.goals, p.assists, p.jogos, p.yellowCards, p.redCards, p.whatsapp, p.active === false ? 'Não' : 'Sim']));
-    syncSheet('PARTIDAS', allData.PARTIDAS.map(m => [m.id, m.data, m.adversario, m.quadro, m.tecnico, m.amistoso, m.wo, m.notes, m.golsPro, m.golsContra, m.faltasTimeT1, m.faltasTimeT2, m.golsAdversarioT1, m.golsAdversarioT2, m.faltasAdversarioT1, m.faltasAdversarioT2]));
-    syncSheet('LANCAMENTOS_ATLETAS', allData.LANCAMENTOS_ATLETAS.map(l => [l.idPartida, l.idAtleta, l.gols, l.assistencias, l.amarelo, l.vermelho, l.faltas, l.golContra, l.pSofri, l.pCometi, l.pPerd, l.nota]));
+    
+    syncSheet('PARTIDAS', allData.PARTIDAS.map(m => [
+      m.id, m.data, m.adversario, m.quadro, m.tecnico, m.amistoso, m.wo, m.notes, 
+      m.golsPro, m.golsContra, 
+      m.faltasTimeT1, m.faltasTimeT2, 
+      m.golsAdversarioT1, m.golsAdversarioT2, 
+      m.faltasAdversarioT1, m.faltasAdversarioT2, 
+      m.arbitro, m.logo
+    ]));
+
+    // LANCAMENTOS AGORA INCLUEM NOME (l.nomeAtleta)
+    syncSheet('LANCAMENTOS_ATLETAS', allData.LANCAMENTOS_ATLETAS.map(l => [
+        l.idPartida, 
+        l.idAtleta,
+        l.nomeAtleta, // NOVO CAMPO
+        l.gols, 
+        l.assistencias, 
+        l.amarelo, 
+        l.vermelho, 
+        l.faltas, 
+        l.golContra, 
+        l.pSofri, 
+        l.pCometi, 
+        l.pPerd, 
+        l.nota, 
+        l.detalhesNota 
+    ]));
+
     syncSheet('DESPESAS', allData.EXPENSES.map(ex => [ex.id, ex.date, ex.description, ex.value, ex.category]));
     
-    // MENSALIDADES - APENAS 4 COLUNAS
+    // MENSALIDADES AGORA INCLUEM NOME (py.nomeAtleta)
     syncSheet('MENSALIDADES', allData.PAYMENTS.map(py => [
-      py.playerId, 
-      py.status, // Contém o mês concatenado se necessário, conforme lógica do front
+      py.playerId,
+      py.nomeAtleta, // NOVO CAMPO
+      py.status, 
       py.value, 
       py.paymentDate || ""
     ]));

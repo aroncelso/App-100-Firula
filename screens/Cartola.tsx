@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { Match, Player, EventType, ScoringRule } from '../types';
-import { Trophy, Calendar, Crown, Medal, UserCog, Info, Star, Target, Zap, Shield, ShieldAlert, Square, Ban, Footprints, Flame, AlertCircle, ToggleLeft, ToggleRight, Edit3, ChevronDown, ChevronUp, Activity } from 'lucide-react';
+import { Trophy, Calendar, Crown, Medal, UserCog, Info, Star, Target, Zap, Shield, ShieldAlert, Square, Ban, Footprints, Flame, AlertCircle, ToggleLeft, ToggleRight, Edit3, ChevronDown, ChevronUp, Activity, Filter, Users } from 'lucide-react';
 
 interface Props {
   matches: Match[];
@@ -10,9 +10,24 @@ interface Props {
   setRules: React.Dispatch<React.SetStateAction<ScoringRule[]>>;
 }
 
+interface BreakdownItem {
+  count: number;
+  points: number;
+  label: string;
+  type: 'positive' | 'negative' | 'coach';
+}
+
+interface CartolaStats {
+  totalPoints: number;
+  matchesCount: number;
+  average: string;
+  breakdown: Record<string, BreakdownItem>;
+}
+
 const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
   const currentYear = new Date().getFullYear().toString();
   const [selectedYear, setSelectedYear] = useState<string>(currentYear);
+  const [selectedQuadro, setSelectedQuadro] = useState<string>('Geral'); // Novo Estado
   const [activeTab, setActiveTab] = useState<'ranking' | 'regras'>('ranking');
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
 
@@ -36,12 +51,12 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
     return rule && rule.active ? rule.value : 0;
   };
 
-  const calculateCartolaStats = (player: Player) => {
+  const calculateCartolaStats = (player: Player): CartolaStats => {
       let totalPoints = 0;
       let matchesCount = 0;
       
       // Armazena detalhes: { 'GOAL_FWD': { count: 3, points: 24, label: 'Gol de Atacante' } }
-      const breakdown: Record<string, { count: number, points: number, label: string, type: 'positive' | 'negative' | 'coach' }> = {};
+      const breakdown: Record<string, BreakdownItem> = {};
 
       const track = (ruleId: string) => {
           const rule = rules.find(r => r.id === ruleId);
@@ -56,7 +71,12 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
       };
 
       matches.forEach(match => {
-          if (!match.date || String(match.date).split('-')[0] !== selectedYear || match.isFriendly) return;
+          // Filtro de Ano
+          if (!match.date || String(match.date).split('-')[0] !== selectedYear) return;
+          // Filtro de Amistoso (Ignora amistosos no ranking)
+          if (match.isFriendly) return;
+          // Filtro de Quadro (NOVO)
+          if (selectedQuadro !== 'Geral' && match.label !== selectedQuadro) return;
           
           let matchPoints = 0;
           let played = false;
@@ -129,7 +149,7 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
       }))
       .filter(p => p.stats.matchesCount > 0)
       .sort((a, b) => b.stats.totalPoints - a.stats.totalPoints);
-  }, [players, matches, selectedYear, rules]);
+  }, [players, matches, selectedYear, selectedQuadro, rules]);
 
   const updateRuleValue = (id: string, value: string) => {
     const num = parseFloat(value);
@@ -183,20 +203,38 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
 
       {activeTab === 'ranking' ? (
           <div className="space-y-6">
-              <div className="flex justify-end gap-1 px-1">
-                {availableYears.map(year => (
-                    <button 
-                        key={year}
-                        onClick={() => setSelectedYear(year)}
-                        className={`px-3 py-1.5 rounded-lg text-[10px] font-black transition-all border ${selectedYear === year ? 'bg-white text-black border-white' : 'text-white/40 border-white/5 hover:text-white'}`}
-                    >
-                        {year}
-                    </button>
-                ))}
+              {/* ÁREA DE FILTROS (ANO E QUADRO) */}
+              <div className="bg-[#0A0A0A] p-4 rounded-3xl border border-white/5 space-y-3">
+                <div className="flex items-center gap-2 px-1">
+                    <Filter size={14} className="text-[#F4BE02]" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Filtros de Ranking</span>
+                </div>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Seletor de Quadro */}
+                    <div className="flex bg-white/5 p-1 rounded-xl">
+                        <button onClick={() => setSelectedQuadro('Geral')} className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${selectedQuadro === 'Geral' ? 'bg-[#F4BE02] text-black shadow-md' : 'text-white/30 hover:text-white'}`}>Geral</button>
+                        <button onClick={() => setSelectedQuadro('Quadro 1')} className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${selectedQuadro === 'Quadro 1' ? 'bg-[#F4BE02] text-black shadow-md' : 'text-white/30 hover:text-white'}`}>Q1</button>
+                        <button onClick={() => setSelectedQuadro('Quadro 2')} className={`flex-1 py-2 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${selectedQuadro === 'Quadro 2' ? 'bg-[#F4BE02] text-black shadow-md' : 'text-white/30 hover:text-white'}`}>Q2</button>
+                    </div>
+
+                    {/* Seletor de Ano */}
+                    <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+                        {availableYears.map(year => (
+                            <button 
+                                key={year}
+                                onClick={() => setSelectedYear(year)}
+                                className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all whitespace-nowrap flex-1 sm:flex-none ${selectedYear === year ? 'bg-white text-black border-white' : 'bg-transparent text-white/30 border-white/10 hover:border-white/30'}`}
+                            >
+                                {year}
+                            </button>
+                        ))}
+                    </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                  {rankedPlayers.map((player, index) => {
+                  {rankedPlayers.length > 0 ? rankedPlayers.map((player, index) => {
                       const rank = index + 1;
                       const isTop3 = rank <= 3;
                       const playerName = player.name || '';
@@ -254,7 +292,7 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
                                    {isExpanded && hasDetails && (
                                        <div className="w-full mt-6 pt-6 border-t border-white/5 animate-in fade-in slide-in-from-top-2">
                                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                               {Object.values(player.stats.breakdown).sort((a,b) => b.points - a.points).map((item, idx) => (
+                                               {(Object.values(player.stats.breakdown) as BreakdownItem[]).sort((a,b) => b.points - a.points).map((item, idx) => (
                                                    <div key={idx} className="flex items-center justify-between bg-white/[0.03] p-2.5 rounded-xl border border-white/[0.02]">
                                                        <div className="flex items-center gap-2">
                                                             <div className={`p-1.5 rounded-lg ${item.points > 0 ? 'bg-[#F4BE02]/10 text-[#F4BE02]' : 'bg-red-500/10 text-red-500'}`}>
@@ -276,7 +314,12 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
                               </button>
                           </div>
                       )
-                  })}
+                  }) : (
+                    <div className="py-20 text-center flex flex-col items-center opacity-30">
+                        <Users size={48} className="mb-4" />
+                        <p className="text-[10px] font-black uppercase tracking-widest">Nenhum dado encontrado para o filtro</p>
+                    </div>
+                  )}
               </div>
           </div>
       ) : (
