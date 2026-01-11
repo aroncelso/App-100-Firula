@@ -1,7 +1,7 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Match, Player, EventType, ScoringRule } from '../types';
-import { Trophy, Calendar, Crown, Medal, UserCog, Info, Star, Target, Zap, Shield, ShieldAlert, Square, Ban, Footprints, Flame, AlertCircle, ToggleLeft, ToggleRight, Edit3, ChevronDown, ChevronUp, Activity, Filter, Users } from 'lucide-react';
+import { Trophy, Calendar, Crown, Medal, UserCog, Info, Star, Target, Zap, Shield, ShieldAlert, Square, Ban, Footprints, Flame, AlertCircle, ToggleLeft, ToggleRight, Edit3, ChevronDown, ChevronUp, Activity, Filter, Users, Plus, Minus, Search } from 'lucide-react';
 
 interface Props {
   matches: Match[];
@@ -27,9 +27,15 @@ interface CartolaStats {
 const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
   const currentYear = new Date().getFullYear().toString();
   const [selectedYear, setSelectedYear] = useState<string>(currentYear);
-  const [selectedQuadro, setSelectedQuadro] = useState<string>('Geral'); // Novo Estado
+  const [selectedQuadro, setSelectedQuadro] = useState<string>('Geral');
+  const [selectedMatchId, setSelectedMatchId] = useState<string>(''); // Filtro de Partida Específica
   const [activeTab, setActiveTab] = useState<'ranking' | 'regras'>('ranking');
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
+
+  // Resetar seleção de partida ao mudar ano ou quadro
+  useEffect(() => {
+    setSelectedMatchId('');
+  }, [selectedYear, selectedQuadro]);
 
   const availableYears = useMemo(() => {
     const years = new Set<string>();
@@ -44,6 +50,19 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
     years.add(currentYear);
     return Array.from(years).sort().reverse();
   }, [matches, currentYear]);
+
+  // Lista de partidas para o dropdown de filtro
+  const availableMatches = useMemo(() => {
+    return matches
+        .filter(m => {
+            if (m.isFriendly) return false;
+            const mYear = String(m.date).split('-')[0];
+            const yearMatch = mYear === selectedYear;
+            const quadroMatch = selectedQuadro === 'Geral' || m.label === selectedQuadro;
+            return yearMatch && quadroMatch;
+        })
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [matches, selectedYear, selectedQuadro]);
 
   // Helper para buscar o valor de uma regra
   const getRuleValue = (id: string): number => {
@@ -75,8 +94,11 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
           if (!match.date || String(match.date).split('-')[0] !== selectedYear) return;
           // Filtro de Amistoso (Ignora amistosos no ranking)
           if (match.isFriendly) return;
-          // Filtro de Quadro (NOVO)
+          // Filtro de Quadro
           if (selectedQuadro !== 'Geral' && match.label !== selectedQuadro) return;
+          
+          // --- NOVO: FILTRO DE PARTIDA ESPECÍFICA ---
+          if (selectedMatchId && match.id !== selectedMatchId) return;
           
           let matchPoints = 0;
           let played = false;
@@ -149,7 +171,7 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
       }))
       .filter(p => p.stats.matchesCount > 0)
       .sort((a, b) => b.stats.totalPoints - a.stats.totalPoints);
-  }, [players, matches, selectedYear, selectedQuadro, rules]);
+  }, [players, matches, selectedYear, selectedQuadro, rules, selectedMatchId]);
 
   const updateRuleValue = (id: string, value: string) => {
     const num = parseFloat(value);
@@ -175,6 +197,12 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
       if (l.includes('técnico')) return <UserCog size={12} />;
       if (l.includes('defesa')) return <Activity size={12} />;
       return <Star size={12} />;
+  };
+
+  const formatDate = (dateStr: string) => {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) return `${parts[2]}/${parts[1]}`;
+      return dateStr;
   };
 
   return (
@@ -231,6 +259,26 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
                         ))}
                     </div>
                 </div>
+
+                {/* NOVO: SELETOR DE PARTIDA ESPECÍFICA */}
+                <div className="relative mt-2">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-[#F4BE02]">
+                        <Search size={14} />
+                    </div>
+                    <select
+                        value={selectedMatchId}
+                        onChange={(e) => setSelectedMatchId(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-2xl py-3 pl-10 pr-10 text-[10px] font-black uppercase tracking-widest appearance-none outline-none focus:border-[#F4BE02]/50 transition-all text-white"
+                    >
+                        <option value="" className="bg-[#0A0A0A] text-white">Todas as Partidas (Acumulado)</option>
+                        {availableMatches.map(m => (
+                            <option key={m.id} value={m.id} className="bg-[#0A0A0A] text-white">
+                                {formatDate(m.date)} | vs {m.opponent} {selectedQuadro === 'Geral' ? `(${m.label})` : ''}
+                            </option>
+                        ))}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 pointer-events-none" />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -273,7 +321,7 @@ const Cartola: React.FC<Props> = ({ matches, players, rules, setRules }) => {
                                                  <span className="text-[8px] font-black uppercase tracking-wider text-white/30 px-1.5 py-0.5 rounded bg-white/5">{player.position}</span>
                                                </div>
                                                <div className="flex items-center gap-3 mt-1 text-[9px] text-white/40 font-bold uppercase tracking-wider">
-                                                   <span>{player.stats.matchesCount} Jogos</span>
+                                                   <span>{player.stats.matchesCount} {selectedMatchId ? 'Jogo' : 'Jogos'}</span>
                                                    <span className="w-1 h-1 rounded-full bg-white/20"></span>
                                                    <span className="flex items-center gap-1">Média {player.stats.average}</span>
                                                </div>
