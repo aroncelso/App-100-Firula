@@ -899,59 +899,68 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
                                     </div>
                                 </div>
 
-                                <div className="flex flex-wrap gap-2 pt-3 border-t border-white/5">
-                                   {(mvpPlayer) && (
-                                       <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-yellow-500/10 border border-yellow-500/20">
-                                          <Crown size={10} className="text-[#F4BE02]"/>
-                                          <div className="flex flex-col leading-none">
-                                            <span className="text-[6px] font-black uppercase text-[#F4BE02]">Craque</span>
-                                            <span className="text-[8px] font-bold text-white truncate max-w-[80px]">{mvpPlayer}</span>
-                                          </div>
-                                       </div>
-                                   )}
-                                   {(highlights.scorer) && (
-                                       <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-500/10 border border-green-500/20">
-                                          <Target size={10} className="text-green-500"/>
-                                          <div className="flex flex-col leading-none">
-                                            <span className="text-[6px] font-black uppercase text-green-500">Artilheiro</span>
-                                            <span className="text-[8px] font-bold text-white truncate max-w-[80px]">{highlights.scorer}</span>
-                                          </div>
-                                       </div>
-                                   )}
-                                   {(highlights.assist) && (
-                                       <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-500/10 border border-blue-500/20">
-                                          <Zap size={10} className="text-blue-500"/>
-                                          <div className="flex flex-col leading-none">
-                                            <span className="text-[6px] font-black uppercase text-blue-500">Garçom</span>
-                                            <span className="text-[8px] font-bold text-white truncate max-w-[80px]">{highlights.assist}</span>
-                                          </div>
-                                       </div>
-                                   )}
-                                   {(m.coach) && (
-                                       <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10">
-                                          <UserCog size={10} className="text-white/40"/>
-                                          <div className="flex flex-col leading-none">
-                                            <span className="text-[6px] font-black uppercase text-white/40">Técnico</span>
-                                            <span className="text-[8px] font-bold text-white truncate max-w-[80px]">{m.coach}</span>
-                                          </div>
-                                       </div>
-                                   )}
-                                   {(m.referee) && (
-                                       <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10">
-                                          <Flag size={10} className="text-white/40"/>
-                                          <div className="flex flex-col leading-none">
-                                            <span className="text-[6px] font-black uppercase text-white/40">Árbitro</span>
-                                            <span className="text-[8px] font-bold text-white truncate max-w-[80px]">{m.referee}</span>
-                                          </div>
-                                       </div>
-                                   )}
-                                   {(highlights.fouler) && (
-                                       <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-red-500/10 border border-red-500/20">
-                                          <AlertTriangle size={10} className="text-red-500"/>
-                                          <div className="flex flex-col leading-none">
-                                            <span className="text-[6px] font-black uppercase text-red-500">Faltoso</span>
-                                            <span className="text-[8px] font-bold text-white truncate max-w-[80px]">{highlights.fouler}</span>
-                                          </div>
+                                <div className="pt-3 border-t border-white/5 space-y-2">
+                                   {/* PRINCIPAIS: Craque, Técnico, Árbitro */}
+                                   <div className="flex flex-wrap gap-2">
+                                       {(mvpPlayer) && (
+                                           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                                              <Crown size={12} className="text-[#F4BE02]"/>
+                                              <div className="flex flex-col leading-none gap-0.5">
+                                                <span className="text-[7px] font-black uppercase text-[#F4BE02] tracking-wider">Craque</span>
+                                                <span className="text-[10px] font-bold text-white truncate max-w-[100px]">{mvpPlayer}</span>
+                                              </div>
+                                           </div>
+                                       )}
+                                       {(m.coach) && (
+                                           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
+                                              <UserCog size={12} className="text-white/40"/>
+                                              <div className="flex flex-col leading-none gap-0.5">
+                                                <span className="text-[7px] font-black uppercase text-white/40 tracking-wider">Técnico</span>
+                                                <span className="text-[10px] font-bold text-white truncate max-w-[100px]">{m.coach}</span>
+                                              </div>
+                                           </div>
+                                       )}
+                                       {(m.referee) && (
+                                           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
+                                              <Flag size={12} className="text-white/40"/>
+                                              <div className="flex flex-col leading-none gap-0.5">
+                                                <span className="text-[7px] font-black uppercase text-white/40 tracking-wider">Árbitro</span>
+                                                <span className="text-[10px] font-bold text-white truncate max-w-[100px]">{m.referee}</span>
+                                              </div>
+                                           </div>
+                                       )}
+                                   </div>
+
+                                   {/* SECUNDÁRIOS: Artilheiro, Garçom, Faltoso */}
+                                   {(highlights.scorer || highlights.assist || highlights.fouler) && (
+                                       <div className="flex flex-wrap gap-2 pt-1">
+                                           {(highlights.scorer) && (
+                                               <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-500/5 border border-green-500/10">
+                                                  <Target size={10} className="text-green-500/70"/>
+                                                  <div className="flex flex-col leading-none">
+                                                    <span className="text-[6px] font-black uppercase text-green-500/70">Artilheiro</span>
+                                                    <span className="text-[8px] font-bold text-white/70 truncate max-w-[80px]">{highlights.scorer}</span>
+                                                  </div>
+                                               </div>
+                                           )}
+                                           {(highlights.assist) && (
+                                               <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-500/5 border border-blue-500/10">
+                                                  <Zap size={10} className="text-blue-500/70"/>
+                                                  <div className="flex flex-col leading-none">
+                                                    <span className="text-[6px] font-black uppercase text-blue-500/70">Garçom</span>
+                                                    <span className="text-[8px] font-bold text-white/70 truncate max-w-[80px]">{highlights.assist}</span>
+                                                  </div>
+                                               </div>
+                                           )}
+                                           {(highlights.fouler) && (
+                                               <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-red-500/5 border border-red-500/10">
+                                                  <AlertTriangle size={10} className="text-red-500/70"/>
+                                                  <div className="flex flex-col leading-none">
+                                                    <span className="text-[6px] font-black uppercase text-red-500/70">Faltoso</span>
+                                                    <span className="text-[8px] font-bold text-white/70 truncate max-w-[80px]">{highlights.fouler}</span>
+                                                  </div>
+                                               </div>
+                                           )}
                                        </div>
                                    )}
                                 </div>
