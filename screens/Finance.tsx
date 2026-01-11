@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Player, Payment, Expense } from '../types';
-import { Wallet, TrendingUp, TrendingDown, Plus, Banknote, Calendar, Receipt, History, DollarSign, Layers, BarChart3, PieChart, ArrowUpCircle, ArrowDownCircle, Trash2, Pencil, AlertCircle, CheckCircle2, RotateCcw, Lock, Users, UserMinus, UserCheck, Clock, Filter, ChevronDown, Search, FileText, ArrowUpRight, ArrowDownRight, Share2, MessageCircle } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, Plus, Banknote, Calendar, Receipt, History, DollarSign, Layers, BarChart3, PieChart, ArrowUpCircle, ArrowDownCircle, Trash2, Pencil, AlertCircle, CheckCircle2, RotateCcw, Lock, Users, UserMinus, UserCheck, Clock, Filter, ChevronDown, Search, FileText, ArrowUpRight, ArrowDownRight, Share2, MessageCircle, Megaphone } from 'lucide-react';
 
 interface Props {
   payments: Payment[];
@@ -438,7 +438,7 @@ const Finance: React.FC<Props> = ({ payments, players, setPayments, expenses, se
         return;
     }
 
-    const cleanPhone = player.whatsapp.replace(/\D/g, '');
+    const cleanPhone = String(player.whatsapp).replace(/\D/g, '');
     const finalPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
 
     const text = `Eai, ${player.name}, tudo bem?
@@ -447,6 +447,28 @@ Quando puder regularizar, por favor me avise.
 Valeu`;
 
     window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  const handleChargeAllPending = () => {
+    if (unpaidPlayers.length === 0) {
+        alert("Não há pendências para cobrar.");
+        return;
+    }
+
+    let text = `⚠️ *AVISO DE MENSALIDADE - 100 FIRULA*\n`;
+    text += `📅 *Referência:* ${currentPeriod}\n\n`;
+    text += `Galera, os seguintes atletas estão pendentes:\n`;
+    text += `------------------------------\n`;
+
+    unpaidPlayers.forEach(({ player }) => {
+        text += `❌ ${player.name}\n`;
+    });
+    
+    text += `------------------------------\n`;
+    text += `💰 Valor: R$ 100,00\n`;
+    text += `Favor regularizar assim que possível!`;
+
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
   };
 
   return (
@@ -541,6 +563,14 @@ Valeu`;
                     <span className="text-[7px] font-black uppercase tracking-wider text-red-500/40">Ref: {currentPeriod}</span>
                   </div>
                 </div>
+                <button 
+                  onClick={handleChargeAllPending}
+                  disabled={unpaidPlayers.length === 0}
+                  className="bg-[#F4BE02] text-black px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg shadow-yellow-500/10 active:scale-95 transition-all disabled:opacity-50 disabled:active:scale-100"
+                >
+                  <Megaphone size={14} />
+                  <span className="text-[9px] font-black uppercase tracking-widest">Cobrar Geral</span>
+                </button>
               </div>
               <div className="space-y-3">
                 {unpaidPlayers.length > 0 ? unpaidPlayers.map(({ player, payment }) => (

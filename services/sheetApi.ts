@@ -134,7 +134,15 @@ export const api = {
         });
 
         return {
-          PLAYERS: (data.PLAYERS || []).map((p: any) => ({ ...p, id: p.id.toString(), goals: Number(p.goals) || 0, assists: Number(p.assistencias) || 0, matchesPlayed: Number(p.jogos) || 0, active: p.active !== 'Não' })),
+          PLAYERS: (data.PLAYERS || []).map((p: any) => ({ 
+            ...p, 
+            id: p.id.toString(), 
+            goals: Number(p.goals) || 0, 
+            assists: Number(p.assistencias) || 0, 
+            matchesPlayed: Number(p.jogos) || 0, 
+            active: p.active !== 'Não',
+            whatsapp: p.whatsapp ? String(p.whatsapp) : undefined 
+          })),
           MATCHES: matches,
           EXPENSES: (data.EXPENSES || []).map((ex: any) => ({ id: ex.id.toString(), description: ex.description || ex.descricao || '', value: Number(ex.value || ex.valor) || 0, date: ensureISO(ex.date || ex.data), category: ex.category || ex.categoria || 'Variável' })),
           

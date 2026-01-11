@@ -175,7 +175,7 @@ const Players: React.FC<Props> = ({ players, matches, onAddPlayer, onEditPlayer 
 
   const openWhatsApp = (phone: string) => {
     if (!phone) return;
-    const cleanPhone = phone.replace(/\D/g, '');
+    const cleanPhone = String(phone).replace(/\D/g, '');
     const finalPhone = cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`;
     window.open(`https://wa.me/${finalPhone}`, '_blank');
   };
