@@ -6,7 +6,7 @@ import {
   Trophy, Star, Crown, Users, Check, Square, ShieldAlert,
   Zap, Target, AlertTriangle, UserCheck,
   Ban, MinusCircle, AlertCircle, UserCog, Filter, ChevronDown, Flag,
-  LayoutGrid, Image as ImageIcon, Search, Share2
+  LayoutGrid, Image as ImageIcon, Search, Share2, ClipboardList
 } from 'lucide-react';
 
 interface Props {
@@ -324,32 +324,49 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
       window.open(url, '_blank');
   };
 
-  const handleShareRatingsReport = (match: Match) => {
-      let text = `*AVALIAÇÕES - ${match.label.toUpperCase()}*\n`;
-      text += `🆚 ${match.opponent}\n📅 ${new Date(match.date + 'T00:00:00').toLocaleDateString('pt-BR')}\n\n`;
+  const handleShareDayRatings = (dayMatches: Match[]) => {
+      if (dayMatches.length === 0) return;
 
-      const ratedPlayerIds = Object.keys(match.playerRatings || {});
-      if (ratedPlayerIds.length === 0) {
-            alert("Sem avaliações para compartilhar nesta partida.");
-            return;
-      }
+      const mainMatch = dayMatches[0];
+      const dateStr = mainMatch.date ? new Date(mainMatch.date + 'T00:00:00').toLocaleDateString('pt-BR') : '';
 
-      // Ordenar por maior média
-      ratedPlayerIds.sort((a,b) => (match.playerRatings![b] || 0) - (match.playerRatings![a] || 0));
+      let text = `*RELATÓRIO DE NOTAS - 100 FIRULA*\n`;
+      text += `📅 ${dateStr} | 🆚 ${mainMatch.opponent}\n\n`;
 
-      ratedPlayerIds.forEach(pid => {
-          const pName = players.find(p => p.id === pid)?.name || 'Atleta';
-          const avg = match.playerRatings![pid]?.toFixed(1);
-          text += `⭐ *${pName}* | Média: *${avg}*\n`;
+      // Ordenar: Quadro 1, depois Quadro 2 (ou vice-versa)
+      const sortedMatches = [...dayMatches].sort((a, b) => a.label.localeCompare(b.label));
 
-          const details = match.detailedRatings?.[pid] || [];
-          if (details.length > 0) {
-              details.forEach(d => {
-                  const evalName = players.find(p => p.id === d.evaluatorId)?.name || 'Anônimo';
-                  text += `   👤 ${evalName}: ${d.score.toFixed(1)}\n`;
+      sortedMatches.forEach((match, index) => {
+          text += `🏆 *${match.label.toUpperCase()}*\n`;
+          text += `------------------------------\n`;
+
+          const ratedPlayerIds = Object.keys(match.playerRatings || {});
+          
+          if (ratedPlayerIds.length === 0) {
+              text += "_Sem avaliações registradas._\n";
+          } else {
+              // Ordenar por nota (maior para menor)
+              ratedPlayerIds.sort((a,b) => (match.playerRatings![b] || 0) - (match.playerRatings![a] || 0));
+              
+              ratedPlayerIds.forEach(pid => {
+                  const pName = players.find(p => p.id === pid)?.name || 'Atleta';
+                  const avg = match.playerRatings![pid]?.toFixed(1);
+                  text += `⭐ *${pName}* | Média: *${avg}*\n`;
+
+                  // Detalhes por avaliador
+                  const details = match.detailedRatings?.[pid] || [];
+                  if (details.length > 0) {
+                      details.forEach(d => {
+                          const evalName = players.find(p => p.id === d.evaluatorId)?.name || 'Anônimo';
+                          text += `   👤 ${evalName}: ${d.score.toFixed(1)}\n`;
+                      });
+                  }
               });
           }
-          text += `\n`;
+          
+          if (index < sortedMatches.length - 1) {
+              text += `\n\n`;
+          }
       });
 
       window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
@@ -824,6 +841,12 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
                          <h3 className="text-sm font-display font-bold uppercase tracking-tight text-white/80">vs {opponent}</h3>
                          <div className="flex items-center gap-2">
                             <button 
+                                onClick={() => handleShareDayRatings(dayMatches)} 
+                                className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-yellow-500 hover:bg-yellow-500/10 transition-colors"
+                            >
+                                <ClipboardList size={14}/>
+                            </button>
+                            <button 
                                 onClick={() => handleShareMatchDay(dayMatches)} 
                                 className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/30 hover:text-green-500 hover:bg-green-500/10 transition-colors"
                             >
@@ -872,48 +895,63 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
                                           <button onClick={() => setRatingMatchId(m.id)} className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/20 hover:text-[#F4BE02]">
                                               <Star size={14} />
                                           </button>
-                                          <button onClick={() => handleShareRatingsReport(m)} className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/20 hover:text-green-500">
-                                              <Share2 size={14} />
-                                          </button>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-y-3 gap-x-2 border-t border-white/5 pt-3">
+                                <div className="flex flex-wrap gap-2 pt-3 border-t border-white/5">
                                    {(mvpPlayer) && (
-                                       <div className="flex flex-col gap-1">
-                                          <span className="text-[7px] font-black uppercase text-[#F4BE02] flex items-center gap-1"><Crown size={8}/> Craque</span>
-                                          <span className="text-[9px] font-bold text-white truncate">{mvpPlayer}</span>
+                                       <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-yellow-500/10 border border-yellow-500/20">
+                                          <Crown size={10} className="text-[#F4BE02]"/>
+                                          <div className="flex flex-col leading-none">
+                                            <span className="text-[6px] font-black uppercase text-[#F4BE02]">Craque</span>
+                                            <span className="text-[8px] font-bold text-white truncate max-w-[80px]">{mvpPlayer}</span>
+                                          </div>
                                        </div>
                                    )}
                                    {(highlights.scorer) && (
-                                       <div className="flex flex-col gap-1 border-l border-white/5 pl-2">
-                                          <span className="text-[7px] font-black uppercase text-[#F4BE02] flex items-center gap-1"><Target size={8}/> Artilheiro</span>
-                                          <span className="text-[9px] font-bold text-white truncate">{highlights.scorer}</span>
+                                       <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-500/10 border border-green-500/20">
+                                          <Target size={10} className="text-green-500"/>
+                                          <div className="flex flex-col leading-none">
+                                            <span className="text-[6px] font-black uppercase text-green-500">Artilheiro</span>
+                                            <span className="text-[8px] font-bold text-white truncate max-w-[80px]">{highlights.scorer}</span>
+                                          </div>
                                        </div>
                                    )}
                                    {(highlights.assist) && (
-                                       <div className="flex flex-col gap-1 border-l border-white/5 pl-2">
-                                          <span className="text-[7px] font-black uppercase text-blue-400 flex items-center gap-1"><Zap size={8}/> Garçom</span>
-                                          <span className="text-[9px] font-bold text-white truncate">{highlights.assist}</span>
+                                       <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-500/10 border border-blue-500/20">
+                                          <Zap size={10} className="text-blue-500"/>
+                                          <div className="flex flex-col leading-none">
+                                            <span className="text-[6px] font-black uppercase text-blue-500">Garçom</span>
+                                            <span className="text-[8px] font-bold text-white truncate max-w-[80px]">{highlights.assist}</span>
+                                          </div>
                                        </div>
                                    )}
                                    {(m.coach) && (
-                                       <div className="flex flex-col gap-1">
-                                          <span className="text-[7px] font-black uppercase text-white/30 flex items-center gap-1"><UserCog size={8}/> Técnico</span>
-                                          <span className="text-[9px] font-bold text-white truncate">{m.coach}</span>
+                                       <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10">
+                                          <UserCog size={10} className="text-white/40"/>
+                                          <div className="flex flex-col leading-none">
+                                            <span className="text-[6px] font-black uppercase text-white/40">Técnico</span>
+                                            <span className="text-[8px] font-bold text-white truncate max-w-[80px]">{m.coach}</span>
+                                          </div>
                                        </div>
                                    )}
                                    {(m.referee) && (
-                                       <div className="flex flex-col gap-1 border-l border-white/5 pl-2">
-                                          <span className="text-[7px] font-black uppercase text-white/30 flex items-center gap-1"><Flag size={8}/> Árbitro</span>
-                                          <span className="text-[9px] font-bold text-white truncate">{m.referee}</span>
+                                       <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/5 border border-white/10">
+                                          <Flag size={10} className="text-white/40"/>
+                                          <div className="flex flex-col leading-none">
+                                            <span className="text-[6px] font-black uppercase text-white/40">Árbitro</span>
+                                            <span className="text-[8px] font-bold text-white truncate max-w-[80px]">{m.referee}</span>
+                                          </div>
                                        </div>
                                    )}
                                    {(highlights.fouler) && (
-                                       <div className="flex flex-col gap-1 border-l border-white/5 pl-2">
-                                          <span className="text-[7px] font-black uppercase text-red-500 flex items-center gap-1"><AlertTriangle size={8}/> Faltoso</span>
-                                          <span className="text-[9px] font-bold text-white truncate">{highlights.fouler}</span>
+                                       <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-red-500/10 border border-red-500/20">
+                                          <AlertTriangle size={10} className="text-red-500"/>
+                                          <div className="flex flex-col leading-none">
+                                            <span className="text-[6px] font-black uppercase text-red-500">Faltoso</span>
+                                            <span className="text-[8px] font-bold text-white truncate max-w-[80px]">{highlights.fouler}</span>
+                                          </div>
                                        </div>
                                    )}
                                 </div>

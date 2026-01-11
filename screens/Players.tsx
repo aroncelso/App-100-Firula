@@ -13,7 +13,7 @@ import {
   Pencil, 
   MessageCircle, 
   Eye, 
-  EyeOff,
+  EyeOff, 
   Trophy,
   Activity,
   Filter,
@@ -100,7 +100,13 @@ const Players: React.FC<Props> = ({ players, matches, onAddPlayer, onEditPlayer 
           const s = statsMap.get(p.id);
           if (s) {
             s.matches++;
-            if (hasRating) s.ratings.push(m.playerRatings![p.id]);
+            if (hasRating) {
+                const val = m.playerRatings![p.id];
+                // Correção de Bug: Ignorar valores absurdos (> 10) que podem ser IDs vazados
+                if (val >= 0 && val <= 10) {
+                    s.ratings.push(val);
+                }
+            }
           }
         }
       });
