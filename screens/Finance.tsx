@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Player, Payment, Expense } from '../types';
-import { Wallet, TrendingUp, TrendingDown, Plus, Banknote, Calendar, Receipt, History, DollarSign, Layers, BarChart3, PieChart, ArrowUpCircle, ArrowDownCircle, Trash2, Pencil, AlertCircle, CheckCircle2, RotateCcw, Lock, Users, UserMinus, UserCheck, Clock, Filter, ChevronDown, Search } from 'lucide-react';
+import { Wallet, TrendingUp, TrendingDown, Plus, Banknote, Calendar, Receipt, History, DollarSign, Layers, BarChart3, PieChart, ArrowUpCircle, ArrowDownCircle, Trash2, Pencil, AlertCircle, CheckCircle2, RotateCcw, Lock, Users, UserMinus, UserCheck, Clock, Filter, ChevronDown, Search, FileText, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 
 interface Props {
   payments: Payment[];
@@ -251,6 +251,46 @@ const Finance: React.FC<Props> = ({ payments, players, setPayments, expenses, se
   }, [expenses, analysisMonth, analysisYear]);
 
   const filteredBalanceAnalysis = filteredRevenueAnalysis - filteredExpensesAnalysis;
+
+  // Lista Detalhada da Análise (União de Entradas e Saídas do Mês Selecionado)
+  const detailedAnalysisList = useMemo(() => {
+      const pList = payments
+        .filter(p => {
+            if (p.status !== 'Pago') return false;
+            const d = parseSafeDate(p.paymentDate || '');
+            return MONTHS[d.getMonth()] === analysisMonth && d.getFullYear().toString() === analysisYear;
+        })
+        .map(p => ({
+            id: `${p.playerId}-${p.month}`,
+            date: p.paymentDate,
+            desc: players.find(pl => pl.id === p.playerId)?.name || 'Atleta Desconhecido',
+            subLabel: 'MENSALIDADE',
+            value: p.value,
+            type: 'IN' as const
+        }));
+
+      const eList = expenses
+        .filter(e => {
+            const d = parseSafeDate(e.date);
+            return MONTHS[d.getMonth()] === analysisMonth && d.getFullYear().toString() === analysisYear;
+        })
+        .map(e => ({
+            id: e.id,
+            date: e.date,
+            desc: e.description,
+            subLabel: e.category,
+            value: e.value,
+            type: 'OUT' as const
+        }));
+
+      // Unir e ordenar por data (mais recente primeiro)
+      return [...pList, ...eList].sort((a, b) => {
+          const dateA = a.date ? new Date(a.date).getTime() : 0;
+          const dateB = b.date ? new Date(b.date).getTime() : 0;
+          return dateB - dateA;
+      });
+  }, [payments, expenses, players, analysisMonth, analysisYear]);
+
 
   // ATUALIZADO: Agora aceita monthRef para saber exatamente qual registro alterar
   const togglePayment = (playerId: string, monthRef: string) => {
@@ -665,6 +705,42 @@ const Finance: React.FC<Props> = ({ payments, players, setPayments, expenses, se
                    <span className={`text-xl font-display font-bold ${filteredBalanceAnalysis >= 0 ? 'text-white' : 'text-red-500'}`}>R$ {Math.abs(filteredBalanceAnalysis).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                 </div>
              </div>
+          </div>
+
+          {/* LISTA DETALHADA DO PERÍODO */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 px-1">
+                <FileText size={14} className="text-[#F4BE02]" />
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Detalhamento do Período</span>
+            </div>
+            {detailedAnalysisList.length > 0 ? (
+                <div className="grid gap-2">
+                    {detailedAnalysisList.map((item, idx) => (
+                        <div key={`${item.id}-${idx}`} className="bg-[#0A0A0A] p-3 rounded-2xl border border-white/5 flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${item.type === 'IN' ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                                    {item.type === 'IN' ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] font-bold uppercase text-white/90">{item.desc}</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[8px] font-black uppercase tracking-widest text-white/30">{parseSafeDate(item.date || '').toLocaleDateString('pt-BR')}</span>
+                                        <span className="w-0.5 h-0.5 rounded-full bg-white/20"></span>
+                                        <span className="text-[7px] font-black uppercase tracking-wider text-white/20">{item.subLabel}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <span className={`font-display font-bold text-xs ${item.type === 'IN' ? 'text-green-500' : 'text-red-500'}`}>
+                                {item.type === 'IN' ? '+' : '-'} R$ {item.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </span>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="py-8 text-center border border-dashed border-white/10 rounded-2xl">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-white/20">Sem lançamentos neste período</p>
+                </div>
+            )}
           </div>
 
           {/* RESULTADO GERAL (Mantido como secundário) */}

@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Match, Player, EventType, MatchEvent, HalfStats } from '../types';
 import { 
@@ -138,10 +139,10 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
       opponent: formMatch.opponent.toUpperCase(),
       notes: formMatch.notes?.toUpperCase(),
       id: formMatch.id || Date.now().toString(),
-    } as Match;
+    };
 
     setFormMatch(matchData);
-    syncMatchToGlobal(matchData);
+    syncMatchToGlobal(matchData as Match);
     setActiveStep('events');
   };
 
