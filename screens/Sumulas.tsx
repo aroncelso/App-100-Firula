@@ -232,6 +232,37 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
     return players.find(p => p.id === mvpId)?.name || null;
   };
 
+  // Calcula destaques individuais da partida
+  const getMatchHighlights = (m: Match) => {
+    const allEvents = [...m.stats.tempo1.events, ...m.stats.tempo2.events];
+    const stats: Record<string, {goals: number, assists: number, fouls: number}> = {};
+
+    allEvents.forEach(e => {
+      if(!stats[e.playerId]) stats[e.playerId] = {goals:0, assists:0, fouls:0};
+      if(e.type === 'GOL') stats[e.playerId].goals++;
+      if(e.type === 'ASSIST') stats[e.playerId].assists++;
+      if(e.type === 'FALTA') stats[e.playerId].fouls++;
+    });
+
+    let topS = { id: '', val: 0 };
+    let topA = { id: '', val: 0 };
+    let topF = { id: '', val: 0 };
+
+    Object.entries(stats).forEach(([pid, s]) => {
+      if(s.goals > topS.val) topS = { id: pid, val: s.goals };
+      if(s.assists > topA.val) topA = { id: pid, val: s.assists };
+      if(s.fouls > topF.val) topF = { id: pid, val: s.fouls };
+    });
+
+    const getName = (id: string) => players.find(p => p.id === id)?.name || '-';
+
+    return {
+      scorer: topS.val > 0 ? `${getName(topS.id)} (${topS.val})` : null,
+      assist: topA.val > 0 ? `${getName(topA.id)} (${topA.val})` : null,
+      fouler: topF.val > 0 ? `${getName(topF.id)} (${topF.val})` : null,
+    };
+  };
+
   const handleShareMatchDay = (dayMatches: Match[]) => {
       if (dayMatches.length === 0) return;
       
@@ -291,6 +322,37 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
 
       const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
       window.open(url, '_blank');
+  };
+
+  const handleShareRatingsReport = (match: Match) => {
+      let text = `*AVALIAÇÕES - ${match.label.toUpperCase()}*\n`;
+      text += `🆚 ${match.opponent}\n📅 ${new Date(match.date + 'T00:00:00').toLocaleDateString('pt-BR')}\n\n`;
+
+      const ratedPlayerIds = Object.keys(match.playerRatings || {});
+      if (ratedPlayerIds.length === 0) {
+            alert("Sem avaliações para compartilhar nesta partida.");
+            return;
+      }
+
+      // Ordenar por maior média
+      ratedPlayerIds.sort((a,b) => (match.playerRatings![b] || 0) - (match.playerRatings![a] || 0));
+
+      ratedPlayerIds.forEach(pid => {
+          const pName = players.find(p => p.id === pid)?.name || 'Atleta';
+          const avg = match.playerRatings![pid]?.toFixed(1);
+          text += `⭐ *${pName}* | Média: *${avg}*\n`;
+
+          const details = match.detailedRatings?.[pid] || [];
+          if (details.length > 0) {
+              details.forEach(d => {
+                  const evalName = players.find(p => p.id === d.evaluatorId)?.name || 'Anônimo';
+                  text += `   👤 ${evalName}: ${d.score.toFixed(1)}\n`;
+              });
+          }
+          text += `\n`;
+      });
+
+      window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
   };
 
   const getEventIcon = (type: EventType) => {
@@ -392,7 +454,7 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
 
       {showForm && currentMatch ? (
         <div className="space-y-4 animate-in slide-in-from-bottom-4 duration-300">
-          
+          {/* ... (código existente do formulário de edição) ... */}
           {/* HEADER DA SESSÃO: Alternar Quadros */}
           <div className="flex items-center gap-2 bg-[#111] p-1.5 rounded-2xl border border-white/10">
              <button 
@@ -627,17 +689,17 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
 
               {/* Lançamento por Atleta - Layout Horizontal Scroll */}
               <div className="space-y-4">
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-white/30 ml-2">Lançamento por Atleta ({activeQuadro})</h4>
-                {currentMatch.roster?.length === 0 ? (
+                 {/* ... (mantém o código de lançamentos existente) ... */}
+                 {currentMatch.roster?.length === 0 ? (
                   <div className="bg-white/5 border border-dashed border-white/10 p-10 rounded-[32px] text-center">
                     <p className="text-[10px] font-black uppercase text-white/20">Nenhum atleta convocado para o {activeQuadro}</p>
                     <button onClick={() => { setActiveStep('info'); setShowRosterModal(true); }} className="mt-4 px-4 py-2 bg-white/10 rounded-xl text-[9px] font-bold uppercase hover:bg-white/20">Convocar Agora</button>
                   </div>
                 ) : (
                   currentMatch.roster
-                    ?.map(pid => players.find(p => p.id === pid)) // Map to objects
-                    .filter((p): p is Player => !!p) // Safety filter
-                    .sort((a, b) => (a.name || '').localeCompare(b.name || '')) // Sort Alphabetically
+                    ?.map(pid => players.find(p => p.id === pid))
+                    .filter((p): p is Player => !!p)
+                    .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
                     .map(player => {
                         const pid = player.id;
                         
@@ -780,6 +842,7 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
                      {dayMatches.sort((a,b) => b.label.localeCompare(a.label)).map(m => { 
                         const score = calculateScore(m);
                         const mvpPlayer = getMVP(m);
+                        const highlights = getMatchHighlights(m);
                         
                         return (
                             <div key={m.id} className="bg-white/[0.02] rounded-2xl border border-white/5 p-4 flex flex-col gap-4">
@@ -805,28 +868,55 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
                                         ) : (
                                             <Trophy size={16} className="text-white/20"/>
                                         )}
-                                        <button onClick={() => setRatingMatchId(m.id)} className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/20 hover:text-[#F4BE02]">
-                                            <Star size={14} />
-                                        </button>
+                                        <div className="flex items-center gap-1">
+                                          <button onClick={() => setRatingMatchId(m.id)} className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/20 hover:text-[#F4BE02]">
+                                              <Star size={14} />
+                                          </button>
+                                          <button onClick={() => handleShareRatingsReport(m)} className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/20 hover:text-green-500">
+                                              <Share2 size={14} />
+                                          </button>
+                                        </div>
                                     </div>
                                 </div>
 
-                                {(mvpPlayer || m.coach || m.referee) && (
-                                    <div className="grid grid-cols-3 gap-2 border-t border-white/5 pt-3">
+                                <div className="grid grid-cols-3 gap-y-3 gap-x-2 border-t border-white/5 pt-3">
+                                   {(mvpPlayer) && (
                                        <div className="flex flex-col gap-1">
                                           <span className="text-[7px] font-black uppercase text-[#F4BE02] flex items-center gap-1"><Crown size={8}/> Craque</span>
-                                          <span className="text-[9px] font-bold text-white truncate">{mvpPlayer || '-'}</span>
+                                          <span className="text-[9px] font-bold text-white truncate">{mvpPlayer}</span>
                                        </div>
+                                   )}
+                                   {(highlights.scorer) && (
                                        <div className="flex flex-col gap-1 border-l border-white/5 pl-2">
-                                          <span className="text-[7px] font-black uppercase text-white/30 flex items-center gap-1"><UserCog size={8}/> Técnico</span>
-                                          <span className="text-[9px] font-bold text-white truncate">{m.coach || '-'}</span>
+                                          <span className="text-[7px] font-black uppercase text-[#F4BE02] flex items-center gap-1"><Target size={8}/> Artilheiro</span>
+                                          <span className="text-[9px] font-bold text-white truncate">{highlights.scorer}</span>
                                        </div>
+                                   )}
+                                   {(highlights.assist) && (
+                                       <div className="flex flex-col gap-1 border-l border-white/5 pl-2">
+                                          <span className="text-[7px] font-black uppercase text-blue-400 flex items-center gap-1"><Zap size={8}/> Garçom</span>
+                                          <span className="text-[9px] font-bold text-white truncate">{highlights.assist}</span>
+                                       </div>
+                                   )}
+                                   {(m.coach) && (
+                                       <div className="flex flex-col gap-1">
+                                          <span className="text-[7px] font-black uppercase text-white/30 flex items-center gap-1"><UserCog size={8}/> Técnico</span>
+                                          <span className="text-[9px] font-bold text-white truncate">{m.coach}</span>
+                                       </div>
+                                   )}
+                                   {(m.referee) && (
                                        <div className="flex flex-col gap-1 border-l border-white/5 pl-2">
                                           <span className="text-[7px] font-black uppercase text-white/30 flex items-center gap-1"><Flag size={8}/> Árbitro</span>
-                                          <span className="text-[9px] font-bold text-white truncate">{m.referee || '-'}</span>
+                                          <span className="text-[9px] font-bold text-white truncate">{m.referee}</span>
                                        </div>
-                                    </div>
-                                )}
+                                   )}
+                                   {(highlights.fouler) && (
+                                       <div className="flex flex-col gap-1 border-l border-white/5 pl-2">
+                                          <span className="text-[7px] font-black uppercase text-red-500 flex items-center gap-1"><AlertTriangle size={8}/> Faltoso</span>
+                                          <span className="text-[9px] font-bold text-white truncate">{highlights.fouler}</span>
+                                       </div>
+                                   )}
+                                </div>
                             </div>
                         )
                      })}
@@ -845,6 +935,7 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
       {/* MODAL DE CONVOCAÇÃO */}
       {showRosterModal && currentMatch && (
         <div className="fixed inset-0 z-[120] bg-black/95 backdrop-blur-xl flex items-end sm:items-center justify-center animate-in fade-in duration-500 p-4">
+           {/* ... (mantido código existente) ... */}
            <div className="w-full max-w-md bg-[#0A0A0A] border border-white/10 rounded-[40px] h-[85vh] flex flex-col shadow-2xl overflow-hidden">
               <div className="p-8 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
                 <div>
@@ -927,6 +1018,7 @@ const Sumulas: React.FC<Props> = ({ matches, players, setMatches }) => {
       {/* MODAL DE NOTAS COM MÚLTIPLOS AVALIADORES */}
       {ratingMatchId && (
         <div className="fixed inset-0 z-[120] bg-black/95 backdrop-blur-xl flex items-end sm:items-center justify-center p-4">
+           {/* ... (mantido código existente) ... */}
            <div className="w-full max-w-md bg-[#0A0A0A] border border-white/10 rounded-[40px] h-[85vh] flex flex-col shadow-2xl overflow-hidden">
               <div className="p-8 border-b border-white/5 bg-white/[0.02] space-y-4">
                 <div className="flex items-center justify-between">
