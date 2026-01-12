@@ -1,7 +1,7 @@
 
 import { Player, Match, Expense, Payment, ScoringRule, MatchEvent, HalfStats, RatingDetail } from '../types';
 
-const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycby8at7NwrXbJs6qiyL1Zv6UhVv0P_KMLDdLh0qhY0-_piKfxxxW1cw1g468--WMzRlS9A/exec';
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz0TPQyhBRA0z-BsPxTUJaE3o77ddwfBlYddDMDW6J9lOxoL7uWyc0IIG0VkYWJiOQ40g/exec';
 
 const ensureISO = (val: any): string => {
   if (!val) return '';
@@ -145,14 +145,20 @@ export const api = {
             paymentType: p.tipo === 'Avulso' ? 'Avulso' : 'Mensalista'
           })),
           MATCHES: matches,
-          EXPENSES: (data.EXPENSES || []).map((ex: any) => ({ 
-            id: ex.id.toString(), 
-            description: ex.description || ex.descricao || '', 
-            value: Number(ex.value || ex.valor) || 0, 
-            date: ensureISO(ex.date || ex.data), 
-            category: ex.category || ex.categoria || 'Variável',
-            type: ex.tipo || 'expense' // Mapeia o tipo (income/expense)
-          })),
+          EXPENSES: (data.EXPENSES || []).map((ex: any) => {
+            // Mapeia de volta da Planilha (Receita/Despesa) para o App (income/expense)
+            const rawType = ex.type || ex.tipo || 'Despesa';
+            const mappedType = (rawType === 'Receita' || rawType === 'income') ? 'income' : 'expense';
+
+            return { 
+                id: ex.id.toString(), 
+                description: ex.description || ex.descricao || '', 
+                value: Number(ex.value || ex.valor) || 0, 
+                date: ensureISO(ex.date || ex.data), 
+                category: ex.category || ex.categoria || 'Variável',
+                type: mappedType
+            };
+          }),
           
           PAYMENTS: (data.PAYMENTS || []).map((py: any) => {
             const rawStatus = py.status || '';
@@ -260,14 +266,14 @@ export const api = {
             faltasTimeT1: m.stats.tempo1.fouls || 0, faltasTimeT2: m.stats.tempo2.fouls || 0, golsAdversarioT1: m.stats.tempo1.opponentGoals || 0, golsAdversarioT2: m.stats.tempo2.opponentGoals || 0, faltasAdversarioT1: m.stats.tempo1.opponentFouls || 0, faltasAdversarioT2: m.stats.tempo2.opponentFouls || 0
           })),
           LANCAMENTOS_ATLETAS: lancamentos,
-          // Atualiza EXPENSES para enviar type
+          // Atualiza EXPENSES para enviar type traduzido (Receita/Despesa)
           EXPENSES: allData.EXPENSES.map(ex => ({ 
              id: ex.id, 
              date: toBRDate(ex.date), 
              description: ex.description, 
              value: ex.value, 
              category: ex.category,
-             type: ex.type || 'expense'
+             type: ex.type === 'income' ? 'Receita' : 'Despesa'
           })),
           PAYMENTS: pagamentosEnriquecidos,
           RULES: allData.RULES

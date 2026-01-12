@@ -20,6 +20,15 @@ type QuadroType = 'Quadro 1' | 'Quadro 2';
 
 const HOME_TEAM_LOGO = "https://i.postimg.cc/tR3cPQZd/100-firula-II-removebg-preview.png";
 
+// Helper para obter data local no formato YYYY-MM-DD
+const getTodayISO = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const Sumulas: React.FC<Props> = ({ matches, players, setPlayers, setMatches }) => {
   const currentYear = new Date().getFullYear().toString();
   const [showForm, setShowForm] = useState(false);
@@ -131,7 +140,7 @@ const Sumulas: React.FC<Props> = ({ matches, players, setPlayers, setMatches }) 
   // --- HANDLERS ---
 
   const handleNewMatchDay = () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayISO();
     const idQ2 = Date.now().toString();
     const idQ1 = (Date.now() + 1).toString();
 
@@ -456,7 +465,7 @@ const Sumulas: React.FC<Props> = ({ matches, players, setPlayers, setMatches }) 
       return myRating ? myRating.score : 0;
   };
   
-  // --- ADICIONAR CONVIDADO ---
+  // --- ADICIONAR CONVIDADO/AVULSO ---
   const handleAddGuest = () => {
       if (!guestName.trim()) return;
       if (!currentMatch) return;
@@ -464,9 +473,10 @@ const Sumulas: React.FC<Props> = ({ matches, players, setPlayers, setMatches }) 
       const newId = Date.now().toString();
       const newPlayer: Player = {
           id: newId,
-          name: guestName.toUpperCase().trim() + ' (C)',
+          name: guestName.toUpperCase().trim() + ' (AV)',
           position: guestPosition,
           active: true,
+          paymentType: 'Avulso',
           goals: 0, assists: 0, matchesPlayed: 0, yellowCards: 0, redCards: 0
       };
 
@@ -1025,7 +1035,7 @@ const Sumulas: React.FC<Props> = ({ matches, players, setPlayers, setMatches }) 
               </div>
               
               <div className="flex-1 overflow-y-auto p-6 space-y-3">
-                {/* BOTÃO ADICIONAR CONVIDADO RÁPIDO */}
+                {/* BOTÃO ADICIONAR AVULSO RÁPIDO */}
                 <div className="mb-4 space-y-3">
                     {!isAddingGuest ? (
                         <button 
@@ -1033,18 +1043,18 @@ const Sumulas: React.FC<Props> = ({ matches, players, setPlayers, setMatches }) 
                             className="w-full p-4 rounded-3xl border border-dashed border-white/20 bg-white/[0.02] flex items-center justify-center gap-3 text-white/40 hover:text-[#F4BE02] hover:border-[#F4BE02] transition-all"
                         >
                             <UserPlus size={18} />
-                            <span className="text-xs font-black uppercase tracking-widest">Adicionar Convidado</span>
+                            <span className="text-xs font-black uppercase tracking-widest">Cadastrar Avulso</span>
                         </button>
                     ) : (
                         <div className="p-5 rounded-3xl bg-[#111] border border-white/10 space-y-3 animate-in fade-in slide-in-from-top-2">
                              <div className="flex justify-between items-center mb-1">
-                                <span className="text-[9px] font-black uppercase text-[#F4BE02]">Novo Convidado</span>
+                                <span className="text-[9px] font-black uppercase text-[#F4BE02]">Novo Jogador Avulso</span>
                                 <button onClick={() => setIsAddingGuest(false)}><X size={14} className="text-white/40" /></button>
                              </div>
                              <input 
                                 autoFocus
                                 type="text"
-                                placeholder="NOME DO CONVIDADO"
+                                placeholder="NOME DO JOGADOR"
                                 className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-xs font-bold uppercase outline-none focus:border-[#F4BE02]"
                                 value={guestName}
                                 onChange={e => setGuestName(e.target.value)}
@@ -1087,7 +1097,7 @@ const Sumulas: React.FC<Props> = ({ matches, players, setPlayers, setMatches }) 
                 {activePlayers.map(p => {
                   const isSelected = currentMatch.roster?.includes(p.id);
                   const isCoach = currentMatch.coach === p.name;
-                  const isGuest = p.name.includes('(C)');
+                  const isGuest = p.paymentType === 'Avulso' || p.name.includes('(AV)') || p.name.includes('(C)');
 
                   return (
                     <div 

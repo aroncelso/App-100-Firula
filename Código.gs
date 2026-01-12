@@ -1,7 +1,9 @@
 
 /**
- * 100 FIRULA SOCIETY - DATABASE ENGINE v19.0 (DYNAMIC EVALUATION COLUMNS)
- * Garante cabeçalhos em Português e gera colunas dinâmicas para cada avaliador.
+ * 100 FIRULA SOCIETY - DATABASE ENGINE v20.2
+ * Alterações:
+ * 1. MENSALIDADES: Força coluna 'Referência' como texto puro (prefixo ').
+ * 2. Suporte a Receita/Despesa na aba DESPESAS (mapeado pelo App).
  */
 
 // CONFIGURAÇÃO DOS CABEÇALHOS FIXOS
@@ -18,7 +20,6 @@ const CONFIG = {
     'FALTAS ADVERSÁRIO T1', 'FALTAS ADVERSÁRIO T2',
     'ÁRBITRO', 'LOGO RIVAL'
   ],
-  // CABEÇALHOS FIXOS - Colunas dinâmicas serão adicionadas APÓS estes
   'LANCAMENTOS_ATLETAS': [
     'ID PARTIDA', 'ID ATLETA', 'NOME ATLETA', 'GOLS', 'ASSISTÊNCIAS', 'AMARELO', 'VERMELHO', 
     'FALTAS', 'GOL CONTRA', 'PÊNALTI SOFRIDO', 'PÊNALTI COMETIDO', 'PÊNALTI PERDIDO', 'NOTA MÉDIA', 'DETALHES_AVALIACAO'
@@ -27,7 +28,7 @@ const CONFIG = {
     'ID', 'DATA', 'DESCRIÇÃO', 'VALOR', 'CATEGORIA', 'TIPO'
   ],
   'MENSALIDADES': [
-    'ID ATLETA', 'NOME ATLETA', 'STATUS', 'VALOR', 'DATA PAGAMENTO'
+    'ID ATLETA', 'NOME ATLETA', 'REFERÊNCIA', 'STATUS', 'VALOR', 'DATA PAGAMENTO'
   ],
   'REGRAS_CARTOLA': [
     'ID', 'RÓTULO', 'CATEGORIA', 'VALOR', 'ATIVO', 'TIPO'
@@ -37,16 +38,9 @@ const CONFIG = {
 function getOrCreateSheet(name) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(name);
-  // Nota: Para LANCAMENTOS_ATLETAS, não forçamos headers aqui para evitar sobrescrever os dinâmicos antes do POST
-  const headers = CONFIG[name];
   
   if (!sheet) {
     sheet = ss.insertSheet(name);
-    if (headers && headers.length > 0) {
-      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-      sheet.setFrozenRows(1);
-      sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBorder(true, true, true, true, null, null);
-    }
   }
   return sheet;
 }
@@ -55,7 +49,7 @@ function formatDate(val) {
   if (!val) return "";
   if (val instanceof Date) return Utilities.formatDate(val, Session.getScriptTimeZone(), "dd/MM/yyyy");
   var str = val.toString().trim();
-  if (str.length > 15 && (str.indexOf("GMT") > -1 || str.indexOf("UTC") > -1 || str.indexOf("T") > -1)) {
+  if (str.length > 10 && (str.indexOf("T") > -1 || str.indexOf("-") > -1)) {
      try {
        var d = new Date(str);
        if (!isNaN(d.getTime())) return Utilities.formatDate(d, Session.getScriptTimeZone(), "dd/MM/yyyy");
@@ -67,22 +61,56 @@ function formatDate(val) {
 function doGet() {
   const result = { PLAYERS: [], PARTIDAS: [], LANCAMENTOS_ATLETAS: [], EXPENSES: [], PAYMENTS: [], RULES: [] };
   try {
+    // 1. JOGADORES
     const sheetPlayers = getOrCreateSheet('JOGADORES');
     if (sheetPlayers.getLastRow() > 1) {
       sheetPlayers.getDataRange().getValues().slice(1).forEach(row => {
         if (!row[0]) return;
-        result.PLAYERS.push({ id: row[0].toString(), name: row[1], position: row[2], goals: Number(row[3]) || 0, assists: Number(row[4]) || 0, jogos: Number(row[5]) || 0, yellowCards: Number(row[6]) || 0, redCards: Number(row[7]) || 0, whatsapp: row[8], active: row[9] !== 'Não', tipo: row[10] });
+        result.PLAYERS.push({ 
+          id: row[0].toString(), 
+          name: row[1], 
+          position: row[2], 
+          goals: Number(row[3]) || 0, 
+          assists: Number(row[4]) || 0, 
+          jogos: Number(row[5]) || 0, 
+          yellowCards: Number(row[6]) || 0, 
+          redCards: Number(row[7]) || 0, 
+          whatsapp: row[8], 
+          active: row[9] !== 'Não', 
+          tipo: row[10] || 'Mensalista'
+        });
       });
     }
 
+    // 2. PARTIDAS
     const sheetMatches = getOrCreateSheet('PARTIDAS');
     if (sheetMatches.getLastRow() > 1) {
       sheetMatches.getDataRange().getValues().slice(1).forEach(row => {
         if (!row[0]) return;
-        result.PARTIDAS.push({ id: row[0].toString(), data: formatDate(row[1]), adversario: row[2], quadro: row[3], tecnico: row[4], amistoso: row[5], wo: row[6], notes: row[7], golsPro: row[8], golsContra: row[9], faltasTimeT1: row[10], faltasTimeT2: row[11], golsAdversarioT1: row[12], golsAdversarioT2: row[13], faltasAdversarioT1: row[14], faltasAdversarioT2: row[15], arbitro: row[16], logo: row[17] });
+        result.PARTIDAS.push({ 
+          id: row[0].toString(), 
+          data: formatDate(row[1]), 
+          adversario: row[2], 
+          quadro: row[3], 
+          tecnico: row[4], 
+          amistoso: row[5], 
+          wo: row[6], 
+          notes: row[7], 
+          golsPro: row[8], 
+          golsContra: row[9], 
+          faltasTimeT1: row[10], 
+          faltasTimeT2: row[11], 
+          golsAdversarioT1: row[12], 
+          golsAdversarioT2: row[13], 
+          faltasAdversarioT1: row[14], 
+          faltasAdversarioT2: row[15], 
+          arbitro: row[16], 
+          logo: row[17] 
+        });
       });
     }
 
+    // 3. LANÇAMENTOS (STATS)
     const sheetL = getOrCreateSheet('LANCAMENTOS_ATLETAS');
     if (sheetL.getLastRow() > 1) {
       sheetL.getDataRange().getValues().slice(1).forEach(row => {
@@ -105,6 +133,7 @@ function doGet() {
       });
     }
 
+    // 4. DESPESAS
     const sheetExpenses = getOrCreateSheet('DESPESAS');
     if (sheetExpenses.getLastRow() > 1) {
       sheetExpenses.getDataRange().getValues().slice(1).forEach(row => {
@@ -115,24 +144,32 @@ function doGet() {
           description: row[2], 
           value: Number(row[3]) || 0, 
           category: row[4],
-          tipo: row[5] || 'expense' // Padrão 'expense' para compatibilidade
+          tipo: row[5] || 'expense'
         });
       });
     }
 
+    // 5. MENSALIDADES
     const sheetPayments = getOrCreateSheet('MENSALIDADES');
     if (sheetPayments.getLastRow() > 1) {
       sheetPayments.getDataRange().getValues().slice(1).forEach(row => {
         if (!row[0]) return;
+        const refRaw = row[2] ? row[2].toString() : "Geral";
+        // Remove apóstrofo se existir ao ler de volta
+        const ref = refRaw.startsWith("'") ? refRaw.substring(1) : refRaw;
+        
+        const statusReal = row[3] ? row[3].toString() : "Pendente";
+        
         result.PAYMENTS.push({ 
           playerId: row[0].toString(),
-          status: row[2] ? row[2].toString() : "Pendente", 
-          value: Number(row[3]) || 0, 
-          paymentDate: formatDate(row[4]) 
+          status: `${statusReal} | ${ref}`, 
+          value: Number(row[4]) || 0, 
+          paymentDate: formatDate(row[5]) 
         });
       });
     }
 
+    // 6. REGRAS
     const sheetRules = getOrCreateSheet('REGRAS_CARTOLA');
     if (sheetRules.getLastRow() > 1) {
       sheetRules.getDataRange().getValues().slice(1).forEach(row => {
@@ -150,18 +187,29 @@ function doGet() {
 function doPost(e) {
   const lock = LockService.getScriptLock();
   try {
-    if (!lock.tryLock(30000)) throw new Error('Servidor ocupado. Tente novamente em alguns segundos.');
+    if (!lock.tryLock(30000)) throw new Error('Servidor ocupado.');
+    
     const payload = JSON.parse(e.postData.contents);
     const allData = payload.data;
     
-    // Função genérica para planilhas simples
+    // Função auxiliar para sincronizar
     const syncSheet = (name, dataRows) => {
       const sheet = getOrCreateSheet(name);
       const headers = CONFIG[name];
+      
+      // 1. SEMPRE Atualiza os cabeçalhos na Linha 1
+      if (headers && headers.length > 0) {
+        sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+        sheet.setFrozenRows(1);
+        sheet.getRange(1, 1, 1, headers.length).setFontWeight("bold").setBorder(true, true, true, true, null, null);
+      }
+      
+      // 2. Limpa dados antigos (da linha 2 para baixo)
       if (sheet.getLastRow() > 1) {
-        // Limpa tudo exceto cabeçalho
         sheet.getDataRange().offset(1, 0).clearContent();
       }
+      
+      // 3. Insere novos dados
       if (dataRows && dataRows.length > 0) {
         var cleanedRows = dataRows.map(row => row.map(cell => cell === null || cell === undefined ? "" : cell.toString()));
         sheet.getRange(2, 1, cleanedRows.length, headers.length).setValues(cleanedRows);
@@ -169,7 +217,11 @@ function doPost(e) {
     };
 
     // 1. JOGADORES
-    syncSheet('JOGADORES', allData.PLAYERS.map(p => [p.id, p.name, p.position, p.goals, p.assists, p.jogos, p.yellowCards, p.redCards, p.whatsapp, p.active === false ? 'Não' : 'Sim', p.tipo]));
+    syncSheet('JOGADORES', allData.PLAYERS.map(p => [
+      p.id, p.name, p.position, p.goals, p.assists, p.jogos, p.yellowCards, p.redCards, p.whatsapp, 
+      p.active === false ? 'Não' : 'Sim', 
+      p.tipo
+    ]));
     
     // 2. PARTIDAS
     syncSheet('PARTIDAS', allData.PARTIDAS.map(m => [
@@ -177,69 +229,75 @@ function doPost(e) {
       m.golsPro, m.golsContra, m.faltasTimeT1, m.faltasTimeT2, m.golsAdversarioT1, m.golsAdversarioT2, m.faltasAdversarioT1, m.faltasAdversarioT2, m.arbitro, m.logo
     ]));
 
-    // 3. LANCAMENTOS_ATLETAS (LÓGICA DINÂMICA)
+    // 3. LANCAMENTOS_ATLETAS (Dinâmico)
     const sheetL = getOrCreateSheet('LANCAMENTOS_ATLETAS');
     const fixedHeaders = CONFIG['LANCAMENTOS_ATLETAS'];
     const lancamentosData = allData.LANCAMENTOS_ATLETAS || [];
 
-    // Identificar todas as chaves dinâmicas de avaliadores
+    // Detectar colunas de avaliadores
     let dynamicKeysSet = new Set();
     lancamentosData.forEach(l => {
-      if (l._evals) {
-        Object.keys(l._evals).forEach(k => dynamicKeysSet.add(k));
-      }
+      if (l._evals) Object.keys(l._evals).forEach(k => dynamicKeysSet.add(k));
     });
-    // Ordenar chaves para consistência (Ex: AVAL: ANA, AVAL: BETO)
     const dynamicHeaders = Array.from(dynamicKeysSet).sort();
-    
-    // Construir cabeçalho completo
     const fullHeaders = [...fixedHeaders, ...dynamicHeaders];
 
-    // Atualizar cabeçalhos na planilha
-    if (sheetL.getLastColumn() < fullHeaders.length) {
-       // Se aumentou o número de colunas, limpa formatação antiga de header e refaz
-       sheetL.getRange(1, 1, 1, sheetL.getMaxColumns()).clearFormat();
-    }
-    sheetL.getRange(1, 1, 1, fullHeaders.length)
-          .setValues([fullHeaders])
-          .setFontWeight("bold")
-          .setBorder(true, true, true, true, null, null);
+    // SEMPRE Atualiza cabeçalhos dinâmicos
+    sheetL.getRange(1, 1, 1, sheetL.getMaxColumns()).clearContent().clearFormat();
+    sheetL.getRange(1, 1, 1, fullHeaders.length).setValues([fullHeaders]);
+    sheetL.setFrozenRows(1);
+    sheetL.getRange(1, 1, 1, fullHeaders.length).setFontWeight("bold").setBorder(true, true, true, true, null, null);
 
-    // Limpar dados antigos
-    if (sheetL.getLastRow() > 1) {
-       sheetL.getDataRange().offset(1, 0).clearContent();
-    }
+    if (sheetL.getLastRow() > 1) sheetL.getDataRange().offset(1, 0).clearContent();
 
-    // Mapear dados
     if (lancamentosData.length > 0) {
       const rows = lancamentosData.map(l => {
-        // Dados Fixos
         const fixedData = [
           l.idPartida, l.idAtleta, l.nomeAtleta, l.gols, l.assistencias, l.amarelo, l.vermelho, 
           l.faltas, l.golContra, l.pSofri, l.pCometi, l.pPerd, l.nota, l.detalhesNota
         ];
-        
-        // Dados Dinâmicos (Notas individuais)
-        const dynamicData = dynamicHeaders.map(headerKey => {
-           return (l._evals && l._evals[headerKey] !== undefined) ? l._evals[headerKey].toString().replace('.', ',') : "";
-        });
-
+        const dynamicData = dynamicHeaders.map(headerKey => (l._evals && l._evals[headerKey] !== undefined) ? l._evals[headerKey].toString().replace('.', ',') : "");
         return [...fixedData, ...dynamicData].map(c => c === null || c === undefined ? "" : c.toString());
       });
-      
       sheetL.getRange(2, 1, rows.length, fullHeaders.length).setValues(rows);
     }
 
-    // 4. OUTRAS PLANILHAS
-    // DESPESAS agora inclui TIPO na coluna 6 (indice 5 no array se fosse 0-based, mas aqui é valor direto)
-    syncSheet('DESPESAS', allData.EXPENSES.map(ex => [ex.id, ex.date, ex.description, ex.value, ex.category, ex.type || 'expense']));
+    // 4. DESPESAS (O App agora envia 'Receita' ou 'Despesa' no campo tipo)
+    syncSheet('DESPESAS', allData.EXPENSES.map(ex => [
+      ex.id, ex.date, ex.description, ex.value, ex.category, ex.type
+    ]));
     
-    syncSheet('MENSALIDADES', allData.PAYMENTS.map(py => [py.playerId, py.nomeAtleta, py.status, py.value, py.paymentDate || ""]));
-    syncSheet('REGRAS_CARTOLA', allData.RULES.map(r => [r.id, r.label, r.category, r.value, r.active ? 'Sim' : 'Não', r.type]));
+    // 5. MENSALIDADES
+    syncSheet('MENSALIDADES', allData.PAYMENTS.map(py => {
+      const rawStatus = py.status || "";
+      const parts = rawStatus.split('|');
+      const realStatus = parts[0] ? parts[0].trim() : "Pendente";
+      const reference = parts[1] ? parts[1].trim() : "Geral";
+      
+      // Força a referência ser texto adicionando ' (Ex: 'Janeiro / 2026)
+      // Isso impede que o Sheets formate como data.
+      const forcedTextReference = "'" + reference;
+
+      return [
+        py.playerId, 
+        py.nomeAtleta, 
+        forcedTextReference, 
+        realStatus, 
+        py.value, 
+        py.paymentDate || ""
+      ];
+    }));
+
+    // 6. REGRAS
+    syncSheet('REGRAS_CARTOLA', allData.RULES.map(r => [
+      r.id, r.label, r.category, r.value, r.active ? 'Sim' : 'Não', r.type
+    ]));
 
     SpreadsheetApp.flush();
     return ContentService.createTextOutput(JSON.stringify({ status: 'success' })).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return ContentService.createTextOutput(JSON.stringify({ status: 'error', message: err.toString() })).setMimeType(ContentService.MimeType.JSON);
-  } finally { lock.releaseLock(); }
+  } finally { 
+    lock.releaseLock(); 
+  }
 }
