@@ -678,9 +678,9 @@ const Sumulas: React.FC<Props> = ({ matches, players, setPlayers, setMatches }) 
                         <div className="flex gap-2.5 overflow-x-auto pb-2 scrollbar-hide -mx-1 px-1">
                            <EventBtn icon={<Target size={18}/>} label="GOL" onClick={() => addEvent(pid, 'GOL')} />
                            <EventBtn icon={<Zap size={18}/>} label="ASSIST" onClick={() => addEvent(pid, 'ASSIST')} />
+                           <EventBtn icon={<AlertTriangle size={18} className="text-orange-400" />} label="FALTA" onClick={() => addEvent(pid, 'FALTA')} />
                            <EventBtn icon={<Square size={18} className="text-yellow-500" fill="currentColor" />} label="CA" onClick={() => addEvent(pid, 'AMARELO')} />
                            <EventBtn icon={<Square size={18} className="text-red-600" fill="currentColor" />} label="CV" onClick={() => addEvent(pid, 'VERMELHO')} />
-                           <EventBtn icon={<AlertTriangle size={18} className="text-orange-400" />} label="FALTA" onClick={() => addEvent(pid, 'FALTA')} />
                            <EventBtn icon={<ShieldAlert size={18} className="text-red-500" />} label="CONTRA" onClick={() => addEvent(pid, 'GOL_CONTRA')} />
                            <EventBtn icon={<CheckCircle2 size={18} className="text-green-500" />} label="P. SOFRI" onClick={() => addEvent(pid, 'PENALTI_SOFRIDO')} />
                            <EventBtn icon={<MinusCircle size={18} className="text-red-500" />} label="P. COMETI" onClick={() => addEvent(pid, 'PENALTI_COMETIDO')} />
